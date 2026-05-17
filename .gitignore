@@ -1,0 +1,21 @@
+# Secrets and local config
+.env
+
+# Database (each deployment starts fresh; use Railway volume for persistence)
+*.db
+
+# Briefing cache
+dashboard/.briefing_cache.json
+report.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/

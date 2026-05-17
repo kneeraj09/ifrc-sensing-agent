@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Humanitarian Sensing Agent — Field Reference</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744; --red: #c8102e; --lgray: #f4f4f4; --mgray: #dddddd;
+      --white: #ffffff; --text: #333333; --subtext: #555555;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--lgray); color: var(--text); font-size: 13px; line-height: 1.6; }
+
+    /* ── Header ── */
+    .doc-header { background: var(--navy); color: var(--white); padding: 18px 40px 14px; border-bottom: 4px solid var(--red); display: flex; justify-content: space-between; align-items: flex-end; }
+    .header-title { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+    .header-sub   { font-size: 13px; font-weight: 300; opacity: .7; margin-top: 3px; font-style: italic; }
+    .header-right { text-align: right; font-size: 11px; opacity: .55; line-height: 1.9; }
+    .cross { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--red); color: white; font-weight: 700; font-size: 16px; border-radius: 3px; margin-right: 10px; vertical-align: middle; }
+
+    /* ── Layout ── */
+    .page    { max-width: 1100px; margin: 32px auto; padding: 0 24px 64px; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    @media (max-width: 720px) { .columns { grid-template-columns: 1fr; } }
+
+    /* ── Section header ── */
+    .sec-header { background: var(--red); color: var(--white); font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; padding: 6px 12px; border-radius: 3px; margin: 20px 0 10px; }
+    .col > .sec-header:first-child { margin-top: 0; }
+
+    /* ── Tables ── */
+    .cs-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    .cs-table thead tr { background: var(--navy); color: var(--white); }
+    .cs-table thead th { padding: 7px 10px; font-size: 11px; font-weight: 600; text-align: left; letter-spacing: .5px; }
+    .cs-table tbody tr:nth-child(odd)  { background: var(--lgray); }
+    .cs-table tbody tr:nth-child(even) { background: var(--white); }
+    .cs-table td { padding: 7px 10px; font-size: 12px; border-top: 1px solid var(--mgray); }
+    .cs-table .wt { font-weight: 600; color: var(--navy); }
+
+    /* ── Numbered steps ── */
+    .steps { list-style: none; }
+    .steps li { padding: 6px 0 6px 28px; position: relative; font-size: 12px; border-bottom: 1px solid var(--mgray); }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before { content: attr(data-n) "."; position: absolute; left: 0; font-weight: 700; color: var(--navy); }
+
+    /* ── Bullets ── */
+    .bullets { list-style: none; }
+    .bullets li { padding: 5px 0 5px 20px; position: relative; font-size: 12px; border-bottom: 1px solid var(--mgray); }
+    .bullets li:last-child { border-bottom: none; }
+    .bullets li::before { content: "—"; position: absolute; left: 0; font-weight: 700; color: var(--red); }
+
+    /* ── Body text ── */
+    .body-text { font-size: 12px; line-height: 1.65; color: var(--subtext); margin-bottom: 10px; }
+    .body-text.bold { font-weight: 600; color: var(--text); }
+    .body-text.navy { color: var(--navy); font-weight: 600; }
+
+    /* ── Demand legend ── */
+    .percentile-row { display: flex; gap: 24px; margin: 8px 0 14px; font-size: 12px; }
+    .percentile-row .p { display: flex; flex-direction: column; gap: 2px; }
+    .percentile-row .p-label { font-weight: 700; color: var(--navy); font-size: 13px; }
+    .percentile-row .p-desc  { font-size: 11px; color: var(--subtext); }
+    .p50-note { font-weight: 600; color: var(--navy); font-size: 11px; margin-top: 2px; }
+
+    /* ── Risk colour swatches ── */
+    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+    .sw-critical { background: #c8102e; }
+    .sw-high     { background: #e07b00; }
+    .sw-medium   { background: #b8860b; }
+    .sw-low      { background: #1a6b3c; }
+    .sw-unknown  { background: #adb5bd; }
+
+    /* ── Footer ── */
+    .doc-footer { background: var(--navy); color: rgba(255,255,255,.5); font-size: 11px; text-align: center; padding: 12px 24px; margin-top: 40px; border-top: 3px solid var(--red); }
+    .doc-footer code { background: rgba(255,255,255,.1); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+
+    /* ── Back link ── */
+    .back-bar { max-width: 1100px; margin: 16px auto 0; padding: 0 24px; }
+    .back-link { font-size: 12px; color: var(--navy); text-decoration: none; font-weight: 500; }
+    .back-link:hover { color: var(--red); }
+  </style>
+</head>
+<body>
+
+<div class="doc-header">
+  <div>
+    <div><span class="cross">+</span><span class="header-title">Humanitarian Sensing Agent</span></div>
+    <div class="header-sub" style="padding-left:38px">Field Reference — How signals become decisions</div>
+  </div>
+  <div class="header-right">
+    IFRC / Sensing Agent v1.0<br>
+    <a href="/" style="color:rgba(255,255,255,.5);font-size:11px;text-decoration:none">← Back to dashboard</a>
+  </div>
+</div>
+
+<div class="back-bar">
+</div>
+
+<div class="page">
+  <div class="columns">
+
+    <!-- ════════════════ LEFT COLUMN ════════════════ -->
+    <div class="col">
+
+      <div class="sec-header">Data Sources</div>
+      <table class="cs-table">
+        <thead><tr><th>Source</th><th>What it captures</th><th>Wt.</th></tr></thead>
+        <tbody>
+          <tr><td>ReliefWeb</td><td>Humanitarian situation reports</td><td class="wt">0.90</td></tr>
+          <tr><td>GDACS</td><td>Disaster alerts: quakes, floods, cyclones, drought</td><td class="wt">0.90</td></tr>
+          <tr><td>FEWS NET</td><td>Food security early warning, IPC phases</td><td class="wt">0.88</td></tr>
+          <tr><td>HDX</td><td>UN Flash Appeals, humanitarian needs overviews</td><td class="wt">0.85</td></tr>
+          <tr><td>ACLED</td><td>Conflict events, security incidents, fatalities</td><td class="wt">0.85</td></tr>
+          <tr><td>BBC RSS</td><td>Breaking news across 5 regional feeds</td><td class="wt">0.75</td></tr>
+          <tr><td>GDELT</td><td>Global media monitoring, 20 articles per cycle</td><td class="wt">0.60</td></tr>
+          <tr><td>Email (IMAP)</td><td>Field sitreps, partner reports sent to inbox</td><td class="wt">0.55</td></tr>
+          <tr><td>WhatsApp</td><td>Direct field reports via Twilio webhook</td><td class="wt">0.40</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">How Signals Are Extracted</div>
+      <ol class="steps">
+        <li data-n="1">Connector fetches raw text from the source</li>
+        <li data-n="2">Claude reads each item and extracts structured signals</li>
+        <li data-n="3">Each signal records: Location, Commodity, Signal type, Urgency, Confidence (0–1)</li>
+        <li data-n="4">Signals stored with full provenance: source, URL, timestamp</li>
+        <li data-n="5">Belief states recomputed every cycle over the last 72 hours</li>
+      </ol>
+
+      <div class="sec-header">Signal Types</div>
+      <table class="cs-table">
+        <thead><tr><th>Type</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><strong>demand</strong></td><td>Unmet need reported at a location</td></tr>
+          <tr><td><strong>capacity</strong></td><td>Available assets: vehicles, stock, staff</td></tr>
+          <tr><td><strong>access</strong></td><td>Road closures, checkpoints, border delays</td></tr>
+          <tr><td><strong>risk</strong></td><td>Weather, displacement, infrastructure threats</td></tr>
+          <tr><td><strong>conflict</strong></td><td>Security incidents, violence, fatalities</td></tr>
+          <tr><td><strong>infrastructure</strong></td><td>Damage to roads, bridges, warehouses</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Field Reporting — Email &amp; WhatsApp</div>
+      <p class="body-text">Field staff can submit situation reports directly. Claude extracts structured signals on the next ingestion cycle. The clearer the message, the higher the confidence score.</p>
+      <table class="cs-table">
+        <thead><tr><th>Channel</th><th>How to send</th><th>Processing</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Email</strong></td><td>Send to the configured inbox, move to <em>IFRC</em> folder</td><td>Next run cycle, source weight 0.55</td></tr>
+          <tr><td><strong>WhatsApp</strong></td><td>Message the Twilio sandbox number</td><td>Stored immediately, processed on next cycle, weight 0.40</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header" style="margin-top:14px">Recommended Message Format</div>
+      <table class="cs-table">
+        <thead><tr><th>Field</th><th>Example</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Location</strong></td><td>South Sudan, Juba</td><td>Drives country-level grouping in the dashboard</td></tr>
+          <tr><td><strong>Commodity</strong></td><td>food / water / shelter / NFIs</td><td>Determines which commodity row the signal appears under</td></tr>
+          <tr><td><strong>Severity</strong></td><td>critical / high / medium</td><td>Sets urgency — mapped directly to risk level</td></tr>
+          <tr><td><strong>Timeframe</strong></td><td>immediate / 24h / 72h</td><td>Urgency window for pre-positioning decisions</td></tr>
+          <tr><td><strong>Detail</strong></td><td>Free text — affected population, root cause</td><td>Improves extraction confidence and SCQA briefing</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header" style="margin-top:14px">Example Field Message</div>
+      <div style="background:#f0f4ff;border-left:3px solid var(--navy);padding:10px 14px;border-radius:3px;font-size:12px;line-height:1.8;color:var(--text)">
+        <strong>Location:</strong> South Sudan — Akobo<br>
+        <strong>Commodity:</strong> Food<br>
+        <strong>Urgency:</strong> Immediate<br>
+        <strong>Detail:</strong> Flooding has cut road access to Akobo town. Estimated 8,000 people without food stock for more than 3 days. Emergency airlift required.
+      </div>
+      <p class="body-text" style="margin-top:8px;font-style:italic">Unstructured free text also works — Claude will infer location, commodity and urgency from context.</p>
+
+    </div>
+
+    <!-- ════════════════ RIGHT COLUMN ════════════════ -->
+    <div class="col">
+
+      <div class="sec-header">Understanding the Demand Index</div>
+      <p class="body-text bold">The demand index is a RELATIVE score (0.0–1.0), not an absolute quantity.</p>
+      <p class="body-text">It is a weighted average of signal confidence, adjusted for source veracity and recency of signals.</p>
+
+      <div class="percentile-row">
+        <div class="p">
+          <span class="p-label">P10</span>
+          <span class="p-desc">Lower bound<br>cautious estimate</span>
+        </div>
+        <div class="p">
+          <span class="p-label" style="color:var(--navy)">P50</span>
+          <span class="p-desc">Central estimate</span>
+          <span class="p50-note">USE THIS for planning</span>
+        </div>
+        <div class="p">
+          <span class="p-label">P90</span>
+          <span class="p-desc">Upper bound<br>worst-case planning</span>
+        </div>
+      </div>
+
+      <table class="cs-table">
+        <thead><tr><th>P50 Range</th><th>What it means</th><th>Suggested action</th></tr></thead>
+        <tbody>
+          <tr><td>0.00–0.20</td><td>Weak signal — limited evidence</td><td>Monitor only</td></tr>
+          <tr><td>0.21–0.40</td><td>Moderate — corroborated by 1–2 sources</td><td>Flag for field check</td></tr>
+          <tr><td>0.41–0.60</td><td>Strong — multiple credible sources agree</td><td>Pre-positioning review</td></tr>
+          <tr><td>0.61–0.80</td><td>High — urgent, recent, high-veracity sources</td><td>Activate response plan</td></tr>
+          <tr><td>0.81–1.00</td><td>Critical — top-tier immediate-action signals</td><td>Escalate immediately</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Risk Levels — Colour Coding</div>
+      <table class="cs-table">
+        <thead><tr><th>Level</th><th>Colour</th><th>Trigger condition</th></tr></thead>
+        <tbody>
+          <tr><td><strong>CRITICAL</strong></td><td><span class="swatch sw-critical"></span>Red</td><td>Immediate urgency from high-veracity sources</td></tr>
+          <tr><td><strong>HIGH</strong></td><td><span class="swatch sw-high"></span>Orange</td><td>24h urgency or multiple corroborating signals</td></tr>
+          <tr><td><strong>MEDIUM</strong></td><td><span class="swatch sw-medium"></span>Amber</td><td>72h urgency or single credible source</td></tr>
+          <tr><td><strong>LOW</strong></td><td><span class="swatch sw-low"></span>Green</td><td>Low urgency or weakly corroborated signal</td></tr>
+          <tr><td><strong>UNKNOWN</strong></td><td><span class="swatch sw-unknown"></span>Grey</td><td>Insufficient signal data to classify</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Source Veracity Weights</div>
+      <p class="body-text">Each source is weighted by institutional credibility. Signals from GDACS or ReliefWeb carry nearly twice the weight of a GDELT media article. The demand index reflects this automatically — one FEWS NET alert outweighs five GDELT headlines.</p>
+
+      <div class="sec-header">Key Rules for Interpretation</div>
+      <ul class="bullets">
+        <li>Index is RELATIVE — compare locations to each other, not to a fixed threshold</li>
+        <li>Check the signal count — P50 of 0.8 from 1 signal is weaker than 0.6 from 8</li>
+        <li>Signals decay over 48 hours — recent signals always outweigh older ones</li>
+        <li>Human overrides take precedence — field officers can annotate belief states</li>
+        <li>SCQA briefing refreshes every 30 min — reflects the last full ingestion cycle</li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+<div class="doc-footer">
+  Ingestion: <code>python main.py run</code> &nbsp;|&nbsp;
+  Dashboard: <code>http://localhost:5050</code> &nbsp;|&nbsp;
+  Signals window: 72 hours &nbsp;|&nbsp;
+  Briefing refresh: 30 min
+</div>
+
+</body>
+</html>

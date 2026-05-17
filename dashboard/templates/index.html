@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Humanitarian Sensing — Situation Brief</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#1a2744; --red:#c8102e; --orange:#e07b00; --amber:#b8860b; --green:#1a6b3c;
+      --gray-50:#f8f9fa; --gray-100:#f0f1f3; --gray-200:#e9ecef; --gray-300:#ced4da;
+      --gray-500:#6c757d; --gray-700:#495057; --gray-900:#212529; --white:#ffffff;
+    }
+    body { font-family:'Inter',sans-serif; background:var(--gray-50); color:var(--gray-900); font-size:14px; line-height:1.6; }
+    .header { background:var(--navy); color:var(--white); padding:16px 40px; display:flex; justify-content:space-between; align-items:center; }
+    .header-logo { display:flex; align-items:center; gap:12px; }
+    .cross { width:30px; height:30px; background:var(--red); display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:16px; border-radius:3px; }
+    .header-title { font-size:15px; font-weight:600; }
+    .header-sub { font-size:11px; font-weight:300; opacity:.65; margin-top:1px; }
+    .header-meta { text-align:right; font-size:11px; opacity:.6; line-height:1.8; }
+    .cheatsheet-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; background:var(--red); color:var(--white); font-size:11px; font-weight:600; border-radius:4px; text-decoration:none; letter-spacing:.5px; transition:opacity .15s; }
+    .cheatsheet-btn:hover { opacity:.85; }
+    .run-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; background:transparent; color:var(--white); font-size:11px; font-weight:600; border-radius:4px; border:1px solid rgba(255,255,255,.35); cursor:pointer; letter-spacing:.5px; transition:background .15s; }
+    .run-btn:hover { background:rgba(255,255,255,.1); }
+    .run-btn:disabled { opacity:.45; cursor:not-allowed; }
+    .run-panel { position:fixed; bottom:0; left:0; right:0; background:#0d1a30; border-top:3px solid var(--red); padding:14px 28px 18px; transform:translateY(100%); transition:transform .3s ease; z-index:200; }
+    .run-panel.open { transform:translateY(0); }
+    .run-panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .run-panel-title { font-size:12px; font-weight:600; color:var(--white); display:flex; align-items:center; gap:10px; }
+    .spinner { width:13px; height:13px; border:2px solid rgba(255,255,255,.25); border-top-color:var(--white); border-radius:50%; animation:spin .75s linear infinite; flex-shrink:0; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .run-log { font-family:'Courier New',monospace; font-size:11px; color:rgba(255,255,255,.65); max-height:130px; overflow-y:auto; line-height:1.7; white-space:pre-wrap; }
+    .commodity-table { padding:0 18px 12px; border-top:1px solid var(--gray-100); }
+    .commodity-table table { margin:0; }
+    .commodity-table th { font-size:10px; padding:5px 8px; }
+    .commodity-table td { font-size:12px; padding:5px 8px; }
+    .page { max-width:1140px; margin:0 auto; padding:28px 24px 64px; }
+    .stats-bar { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--gray-300); border:1px solid var(--gray-300); border-radius:8px; overflow:hidden; margin-bottom:28px; }
+    .stat { background:var(--white); padding:14px 20px; text-align:center; }
+    .stat-value { font-size:26px; font-weight:700; line-height:1; }
+    .stat-label { font-size:10px; color:var(--gray-500); margin-top:4px; text-transform:uppercase; letter-spacing:.8px; }
+    .stat-value.red  { color:var(--red); }
+    .stat-value.navy { color:var(--navy); }
+    .section-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; color:var(--gray-500); margin-bottom:10px; margin-top:28px; }
+    .briefing { background:var(--white); border:1px solid var(--gray-300); border-radius:8px; overflow:hidden; margin-bottom:28px; }
+    .briefing-header { background:var(--navy); color:var(--white); padding:12px 24px; font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; }
+    .briefing-body { padding:22px 24px; }
+    .scqa-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--gray-100); border-radius:6px; overflow:hidden; margin-bottom:18px; }
+    .scqa-cell { padding:14px 18px; border-right:1px solid var(--gray-100); border-bottom:1px solid var(--gray-100); }
+    .scqa-cell:nth-child(2n) { border-right:none; }
+    .scqa-cell:nth-child(3),.scqa-cell:nth-child(4) { border-bottom:none; }
+    .scqa-tag  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gray-500); margin-bottom:5px; }
+    .scqa-text { font-size:13px; line-height:1.5; color:var(--gray-700); }
+    .recs { list-style:none; }
+    .recs li { padding:7px 0 7px 20px; border-bottom:1px solid var(--gray-100); font-size:13px; position:relative; color:var(--gray-700); }
+    .recs li:last-child { border-bottom:none; }
+    .recs li::before { content:attr(data-n); position:absolute; left:0; font-weight:700; color:var(--navy); }
+    .briefing-footer { padding:8px 24px; background:var(--gray-50); border-top:1px solid var(--gray-100); font-size:11px; color:var(--gray-500); }
+    .tab-bar { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:20px; overflow-x:auto; }
+    .tab-btn { padding:10px 18px; font-size:12px; font-weight:500; color:var(--gray-500); background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; cursor:pointer; white-space:nowrap; transition:color .15s; }
+    .tab-btn:hover { color:var(--navy); }
+    .tab-btn.active { color:var(--navy); border-bottom-color:var(--red); font-weight:600; }
+    .tab-badge { display:inline-block; background:var(--gray-100); color:var(--gray-500); font-size:10px; font-weight:600; border-radius:10px; padding:1px 6px; margin-left:5px; }
+    .tab-badge.has-alert { background:#fde8eb; color:var(--red); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .group-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; margin-top:24px; }
+    .group-pill { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; padding:3px 10px; border-radius:20px; }
+    .pill-action  { background:#fde8eb; color:var(--red); }
+    .pill-monitor { background:#fff3cd; color:var(--amber); }
+    .pill-watch   { background:#e8f5ee; color:var(--green); }
+    .group-count { font-size:12px; color:var(--gray-500); }
+    .belief { background:var(--white); border:1px solid var(--gray-300); border-radius:8px; margin-bottom:7px; overflow:hidden; }
+    .belief-bar { height:3px; }
+    .bar-critical { background:var(--red); }
+    .bar-high     { background:var(--orange); }
+    .bar-medium   { background:#f0c040; }
+    .bar-low      { background:var(--green); }
+    .bar-unknown  { background:var(--gray-300); }
+    .belief-main { padding:12px 18px; display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+    .belief-location { font-size:14px; font-weight:600; }
+    .belief-meta     { font-size:12px; color:var(--gray-500); margin-top:2px; }
+    .belief-right    { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    .risk-badge { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; padding:3px 9px; border-radius:3px; }
+    .risk-critical { background:#fde8eb; color:var(--red); }
+    .risk-high     { background:#fff0e0; color:var(--orange); }
+    .risk-medium   { background:#fffbe0; color:var(--amber); }
+    .risk-low      { background:#e8f5ee; color:var(--green); }
+    .risk-unknown  { background:var(--gray-100); color:var(--gray-500); }
+    .demand-row { padding:0 18px 10px; display:flex; align-items:center; gap:14px; }
+    .demand-label { font-size:11px; color:var(--gray-500); min-width:88px; }
+    .demand-vals  { font-size:12px; color:var(--gray-700); }
+    .demand-vals strong { color:var(--navy); }
+    .demand-track { flex:1; height:4px; background:var(--gray-100); border-radius:2px; max-width:140px; }
+    .demand-fill  { height:4px; border-radius:2px; background:var(--navy); }
+    .toggle-btn { font-size:11px; color:var(--gray-500); background:none; border:1px solid var(--gray-300); border-radius:4px; padding:3px 9px; cursor:pointer; white-space:nowrap; }
+    .toggle-btn:hover { background:var(--gray-50); }
+    .signal-section { border-top:1px solid var(--gray-100); padding:14px 18px; display:none; }
+    .signal-section.open { display:block; }
+    .signal-section-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--gray-500); margin-bottom:8px; }
+    table { width:100%; border-collapse:collapse; }
+    th { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--gray-500); padding:5px 8px; border-bottom:1px solid var(--gray-100); text-align:left; }
+    td { font-size:12px; padding:7px 8px; border-bottom:1px solid var(--gray-100); color:var(--gray-700); vertical-align:top; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:var(--gray-50); }
+    .src-badge { font-size:10px; font-weight:600; text-transform:uppercase; padding:2px 6px; border-radius:3px; background:var(--gray-100); color:var(--navy); }
+    .conf-bar  { width:44px; height:4px; background:var(--gray-100); border-radius:2px; display:inline-block; vertical-align:middle; }
+    .conf-fill { height:4px; border-radius:2px; background:var(--navy); }
+    a { color:var(--navy); } a:hover { color:var(--red); }
+    .region-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; margin-bottom:28px; }
+    .region-card { background:var(--white); border:1px solid var(--gray-300); border-radius:8px; padding:14px 16px; border-top:3px solid var(--gray-300); }
+    .region-card.top-critical { border-top-color:var(--red); }
+    .region-card.top-high     { border-top-color:var(--orange); }
+    .region-card.top-medium   { border-top-color:#f0c040; }
+    .region-card.top-low      { border-top-color:var(--green); }
+    .region-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .region-card-name   { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.9px; color:var(--navy); }
+    .region-card-headline { font-size:12px; line-height:1.55; color:var(--gray-700); margin-bottom:10px; }
+    .region-card-action { font-size:11px; color:var(--gray-500); border-top:1px solid var(--gray-100); padding-top:8px; }
+    .region-card-action::before { content:"→ "; font-weight:700; color:var(--navy); }
+    .empty { text-align:center; padding:40px; color:var(--gray-500); font-size:13px; }
+    .empty code { background:var(--gray-100); padding:2px 6px; border-radius:3px; }
+    .no-data { padding:24px; text-align:center; color:var(--gray-500); font-size:13px; }
+  </style>
+</head>
+<body>
+
+{# ── Macro defined first so it can be called anywhere below ── #}
+{% macro render_groups(groups, prefix) %}
+  {% set rows = [
+    ("action",  "Requires Immediate Action", "pill-action"),
+    ("monitor", "Monitor Closely",           "pill-monitor"),
+    ("watch",   "Watch List",                "pill-watch")
+  ] %}
+  {% set has_any = groups.action or groups.monitor or groups.watch %}
+  {% if not has_any %}
+    <div class="no-data">No signals detected for this region in the current monitoring window.</div>
+  {% else %}
+    {% for key, label, pill in rows %}
+      {% if groups[key] %}
+      <div class="group-header">
+        <span class="group-pill {{ pill }}">{{ label }}</span>
+        <span class="group-count">{{ groups[key]|length }} location(s)</span>
+      </div>
+      {% for b in groups[key] %}
+      {% set cid = prefix ~ loop.index ~ key %}
+      <div class="belief">
+        <div class="belief-bar bar-{{ b.risk_level }}"></div>
+        <div class="belief-main">
+          <div>
+            <div class="belief-location">
+              {{ b.location }}
+              {% if b.country and b.country != b.location %}<span style="color:var(--gray-500);font-weight:400"> — {{ b.country }}</span>{% endif %}
+              <span style="font-size:11px;color:var(--gray-500);font-weight:400;margin-left:6px">{{ b.region }}</span>
+            </div>
+            <div class="belief-meta">
+              {{ b.commodity_beliefs|length }} commodit{{ "y" if b.commodity_beliefs|length == 1 else "ies" }}
+              &bull; {{ b.time_window }}
+              {% if b.alert %}&bull; <span style="color:var(--red)">{{ b.alert }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="belief-right">
+            <span class="risk-badge risk-{{ b.risk_level }}">{{ b.risk_level }}</span>
+            <button class="toggle-btn" onclick="toggle(this,'{{ cid }}')">
+              {{ b.all_signals|length }} signal(s) ▾
+            </button>
+          </div>
+        </div>
+        <div class="commodity-table">
+          <table>
+            <thead><tr><th>Commodity</th><th>P50 index</th><th>Risk</th><th>Signals</th></tr></thead>
+            <tbody>
+              {% for cb in b.commodity_beliefs %}
+              <tr>
+                <td>{{ cb.commodity|title }}</td>
+                <td>
+                  {% if cb.demand_p50 is not none %}
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <strong>{{ "%.2f"|format(cb.demand_p50) }}</strong>
+                    <div class="demand-track"><div class="demand-fill" style="width:{{ [cb.demand_p50*100,100]|min|int }}%"></div></div>
+                  </div>
+                  {% else %}—{% endif %}
+                </td>
+                <td><span class="risk-badge risk-{{ cb.risk_level }}">{{ cb.risk_level }}</span></td>
+                <td style="color:var(--gray-500)">{{ cb.signals|length }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="signal-section" id="{{ cid }}">
+          <div class="signal-section-label">Supporting Signals</div>
+          {% if b.all_signals %}
+          <table>
+            <thead><tr><th>Source</th><th>Type</th><th>Commodity</th><th>Urgency</th><th>Confidence</th><th>Summary</th><th>Date</th></tr></thead>
+            <tbody>
+              {% for s in b.all_signals %}
+              <tr>
+                <td><span class="src-badge">{{ s.source_type }}</span></td>
+                <td>{{ s.signal_type }}</td>
+                <td>{{ s.commodity or '—' }}</td>
+                <td>{{ s.urgency }}</td>
+                <td>
+                  <div class="conf-bar"><div class="conf-fill" style="width:{{ (s.confidence*100)|int }}%"></div></div>
+                  {{ (s.confidence*100)|int }}%
+                </td>
+                <td>{% if s.url %}<a href="{{ s.url }}" target="_blank">{{ s.raw_text }}</a>{% else %}{{ s.raw_text }}{% endif %}</td>
+                <td style="white-space:nowrap">{{ s.timestamp[:10] }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="no-data">No signals available.</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endmacro %}
+
+<div class="header">
+  <div class="header-logo">
+    <div class="cross">+</div>
+    <div>
+      <div class="header-title">Humanitarian Sensing Agent</div>
+      <div class="header-sub">Situation Brief — Activation Phase Intelligence</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px">
+    <div class="header-meta">
+      <div>As of {{ stats.last_ingested or 'No data' }}</div>
+      <div>{{ stats.total_signals }} signals &bull; {{ stats.total_beliefs }} locations tracked</div>
+    </div>
+    <button id="run-btn" class="run-btn" onclick="runCycle()">↻ Run cycle</button>
+    <a href="/cheatsheet" class="cheatsheet-btn">Field Guide</a>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-value red">{{ stats.alerts }}</div><div class="stat-label">Require Action</div></div>
+    <div class="stat"><div class="stat-value navy">{{ beliefs|length }}</div><div class="stat-label">Locations Tracked</div></div>
+    <div class="stat"><div class="stat-value navy">{{ stats.total_signals }}</div><div class="stat-label">Signals Processed</div></div>
+    <div class="stat"><div class="stat-value navy">{{ active_regions|length }}</div><div class="stat-label">Regions Active</div></div>
+  </div>
+
+  <div class="section-label">Executive Briefing — Minto SCQA</div>
+  <div class="briefing">
+    <div class="briefing-header">Global Situation Brief</div>
+    <div class="briefing-body">
+      <div class="scqa-grid">
+        <div class="scqa-cell"><div class="scqa-tag">Situation</div><div class="scqa-text">{{ briefing.situation }}</div></div>
+        <div class="scqa-cell"><div class="scqa-tag">Complication</div><div class="scqa-text">{{ briefing.complication }}</div></div>
+        <div class="scqa-cell"><div class="scqa-tag">Question</div><div class="scqa-text">{{ briefing.question }}</div></div>
+        <div class="scqa-cell"><div class="scqa-tag">So What</div><div class="scqa-text">{{ briefing.answer }}</div></div>
+      </div>
+      {% if briefing.recommendations %}
+      <div class="section-label" style="margin-top:0">Recommended Actions</div>
+      <ul class="recs">
+        {% for r in briefing.recommendations %}
+        <li data-n="{{ loop.index }}">{{ r }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    <div class="briefing-footer">Generated by Claude &bull; Refreshes every 30 min &bull; {{ briefing.generated_at }}</div>
+  </div>
+
+  {% if briefing.regions %}
+  <div class="section-label">Regional Situation Briefs</div>
+  <div class="region-grid">
+    {% for region in active_regions %}
+    {% if region in briefing.regions %}
+    {% set rb = briefing.regions[region] %}
+    <div class="region-card top-{{ rb.risk }}">
+      <div class="region-card-header">
+        <span class="region-card-name">{{ region }}</span>
+        <span class="risk-badge risk-{{ rb.risk }}">{{ rb.risk }}</span>
+      </div>
+      <div class="region-card-headline">{{ rb.headline }}</div>
+      <div class="region-card-action">{{ rb.action }}</div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="section-label">Situation by Region</div>
+
+  {% if not beliefs %}
+  <div class="empty">No data yet. Run <code>python main.py run</code> to ingest and compute belief states.</div>
+  {% else %}
+
+  <div class="tab-bar">
+    {% set all_alerts = [] %}
+    {% for b in beliefs %}{% if b.risk_level in ["critical","high"] %}{% set _ = all_alerts.append(b) %}{% endif %}{% endfor %}
+    <button class="tab-btn active" onclick="switchTab(event,'tab-all')">
+      All <span class="tab-badge {% if all_alerts %}has-alert{% endif %}">{{ beliefs|length }}</span>
+    </button>
+    {% for region in active_regions %}
+    {% set rg = region_groups[region] %}
+    {% set ra = [] %}
+    {% for b in rg %}{% if b.risk_level in ["critical","high"] %}{% set _ = ra.append(b) %}{% endif %}{% endfor %}
+    <button class="tab-btn" onclick="switchTab(event,'tab-{{ region|replace(' ','-')|lower }}')">
+      {{ region }} <span class="tab-badge {% if ra %}has-alert{% endif %}">{{ rg|length }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  <div class="tab-panel active" id="tab-all">
+    {{ render_groups(priority_groups, "all") }}
+  </div>
+
+  {% for region in active_regions %}
+  <div class="tab-panel" id="tab-{{ region|replace(' ','-')|lower }}">
+    {{ render_groups(region_priority_groups[region], region|replace(' ','-')|lower) }}
+  </div>
+  {% endfor %}
+
+  {% endif %}
+</div>
+
+<script>
+  function switchTab(e, id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    document.getElementById(id).classList.add('active');
+  }
+  function toggle(btn, id) {
+    const el = document.getElementById(id);
+    const open = el.classList.toggle('open');
+    btn.textContent = btn.textContent.replace(open ? '▾' : '▴', open ? '▴' : '▾');
+  }
+
+  function runCycle() {
+    const btn    = document.getElementById('run-btn');
+    const panel  = document.getElementById('run-panel');
+    const log    = document.getElementById('run-log');
+    const title  = document.getElementById('run-title');
+    const spinner = document.getElementById('run-spinner');
+
+    btn.disabled = true;
+    btn.textContent = '↻ Running…';
+    panel.classList.add('open');
+    log.textContent = '';
+    title.textContent = 'Ingestion cycle running…';
+    spinner.style.display = 'inline-block';
+
+    fetch('/run', { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'already_running') {
+          title.textContent = 'Already running — please wait';
+          return;
+        }
+        const poll = setInterval(() => {
+          fetch('/run/status')
+            .then(r => r.json())
+            .then(s => {
+              log.textContent = s.log.join('\n');
+              log.scrollTop = log.scrollHeight;
+              if (s.status === 'done' || s.status === 'error') {
+                clearInterval(poll);
+                spinner.style.display = 'none';
+                if (s.status === 'done') {
+                  title.textContent = '✓ Done — reloading dashboard…';
+                  setTimeout(() => location.reload(), 1500);
+                } else {
+                  title.textContent = '✗ Cycle failed — see log above';
+                  btn.disabled = false;
+                  btn.textContent = '↻ Run cycle';
+                }
+              }
+            });
+        }, 2000);
+      });
+  }
+</script>
+
+<div id="run-panel" class="run-panel">
+  <div class="run-panel-header">
+    <div class="run-panel-title">
+      <span id="run-spinner" class="spinner" style="display:none"></span>
+      <span id="run-title">Ingestion cycle running…</span>
+    </div>
+  </div>
+  <div id="run-log" class="run-log"></div>
+</div>
+
+</body>
+</html>
