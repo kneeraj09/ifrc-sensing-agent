@@ -244,6 +244,9 @@ _run_lock  = threading.Lock()
 _ROOT      = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
+_RUN_TIMEOUT_SECONDS = 900  # 15 min max per full cycle
+
+
 def _run_background():
     with _run_lock:
         _run_state.update({"status": "running", "log": []})
@@ -253,12 +256,16 @@ def _run_background():
             [sys.executable, "main.py", "run"],
             cwd=_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
-        for line in proc.stdout:
-            lines.append(line.rstrip())
-            with _run_lock:
-                _run_state["log"] = lines[-60:]
-        proc.wait()
-        status = "done" if proc.returncode == 0 else "error"
+        try:
+            stdout, _ = proc.communicate(timeout=_RUN_TIMEOUT_SECONDS)
+            lines = [l.rstrip() for l in stdout.splitlines()]
+            status = "done" if proc.returncode == 0 else "error"
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, _ = proc.communicate()
+            lines = [l.rstrip() for l in stdout.splitlines()]
+            lines.append(f"[timeout] Cycle killed after {_RUN_TIMEOUT_SECONDS}s")
+            status = "error"
     except Exception as e:
         lines.append(f"ERROR: {e}")
         status = "error"
@@ -280,6 +287,13 @@ def run_cycle():
 def run_status():
     with _run_lock:
         return jsonify(_run_state.copy())
+
+
+@app.route("/run/reset", methods=["POST"])
+def run_reset():
+    with _run_lock:
+        _run_state.update({"status": "idle", "log": ["[reset] State cleared manually."]})
+    return jsonify({"status": "idle"})
 
 
 @app.route("/cheatsheet")
@@ -413,12 +427,16 @@ def _run_demand_background():
             [sys.executable, "main.py", "demand-run"],
             cwd=_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
-        for line in proc.stdout:
-            lines.append(line.rstrip())
-            with _demand_run_lock:
-                _demand_run_state["log"] = lines[-60:]
-        proc.wait()
-        status = "done" if proc.returncode == 0 else "error"
+        try:
+            stdout, _ = proc.communicate(timeout=300)
+            lines = [l.rstrip() for l in stdout.splitlines()]
+            status = "done" if proc.returncode == 0 else "error"
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, _ = proc.communicate()
+            lines = [l.rstrip() for l in stdout.splitlines()]
+            lines.append("[timeout] Demand cycle killed after 300s")
+            status = "error"
     except Exception as e:
         lines.append(f"ERROR: {e}")
         status = "error"

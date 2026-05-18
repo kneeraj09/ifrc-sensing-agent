@@ -1,3 +1,4 @@
+import socket
 import feedparser
 from datetime import datetime
 
@@ -19,7 +20,12 @@ def fetch_alerts(limit: int = 30) -> list[dict]:
     """
     for feed_url in _FEEDS:
         try:
-            feed = feedparser.parse(feed_url)
+            old_timeout = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(20)
+            try:
+                feed = feedparser.parse(feed_url)
+            finally:
+                socket.setdefaulttimeout(old_timeout)
             if not feed.entries:
                 continue
             articles = []
