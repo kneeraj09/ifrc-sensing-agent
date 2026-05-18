@@ -12,22 +12,20 @@ def fetch_messages(limit: int = 100) -> list[dict]:
         return []
 
     articles = []
-    ids = []
     for msg in messages:
         body = (msg.get("body") or "").strip()
         if not body:
             continue
-        ids.append(msg["id"])
         articles.append({
             "source_type":   "whatsapp",
             "source_id":     f"wa_{msg['id']}",
+            "_inbox_id":     msg["id"],   # used by main.py to ack after extraction
             "url":           "",
             "timestamp":     msg["received_at"],
             "raw_text":      f"WhatsApp from {msg.get('from_number', 'unknown')}:\n{body}",
             "location_hint": {},
         })
 
-    if ids:
-        mark_whatsapp_processed(ids)
-
+    # NOTE: do NOT mark processed here — main.py acks each message individually
+    # after extraction succeeds, so a mid-cycle crash won't silently discard messages.
     return articles

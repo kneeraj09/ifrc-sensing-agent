@@ -15,7 +15,8 @@ from store.db import (init_db, upsert_signal, upsert_belief_state, get_recent_si
                       get_belief_states, source_already_processed, clear_belief_states,
                       upsert_logistics_request, get_pending_requests, upsert_demand_cluster,
                       upsert_proposal, clear_demand_clusters, demand_source_already_processed,
-                      mark_demand_source_processed, get_unprocessed_demand_messages)
+                      mark_demand_source_processed, get_unprocessed_demand_messages,
+                      mark_whatsapp_processed)
 from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp
 from extraction.agent import extract_signals
 from belief.aggregator import compute_belief_states
@@ -73,6 +74,9 @@ def cmd_ingest(sources: list[str], dry_run: bool = False) -> list:
             all_signals.append(sig)
         if signals:
             print(f"  [{i:>3}/{len(articles)}] {article['source_type']:>10}  +{len(signals)} signal(s)")
+        # Ack WhatsApp messages after extraction (success or empty) — not on exception
+        if not dry_run and article.get("source_type") == "whatsapp" and article.get("_inbox_id"):
+            mark_whatsapp_processed([article["_inbox_id"]])
 
     print(f"\n[sensing] Stored {len(all_signals)} signal(s) total. ({skipped} article(s) already processed — skipped)")
     return all_signals
