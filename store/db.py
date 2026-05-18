@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from datetime import datetime
-from models import Signal, BeliefState
+from models import Signal, BeliefState, LogisticsRequest, DemandCluster, ConsolidationProposal
 from config import DB_PATH
 
 _SCHEMA = """
@@ -34,6 +34,59 @@ CREATE TABLE IF NOT EXISTS signals (
     url             TEXT,
     extractor_model TEXT,
     created_at      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS logistics_requests (
+    id                TEXT PRIMARY KEY,
+    source            TEXT,
+    source_message_id TEXT,
+    requesting_org    TEXT,
+    origin            TEXT,
+    destination       TEXT,
+    commodity         TEXT,
+    quantity          REAL,
+    unit              TEXT,
+    deadline          TEXT,
+    urgency           TEXT,
+    notes             TEXT,
+    status            TEXT DEFAULT 'pending',
+    confidence        REAL,
+    raw_text          TEXT,
+    created_at        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS demand_clusters (
+    id                  TEXT PRIMARY KEY,
+    request_ids         TEXT,
+    corridor            TEXT,
+    commodity           TEXT,
+    time_window         TEXT,
+    total_quantity      REAL,
+    unit                TEXT,
+    compatibility_notes TEXT,
+    status              TEXT DEFAULT 'proposed',
+    created_at          TEXT
+);
+
+CREATE TABLE IF NOT EXISTS consolidation_proposals (
+    id                TEXT PRIMARY KEY,
+    cluster_id        TEXT,
+    proposal_text     TEXT,
+    rationale         TEXT,
+    estimated_saving  TEXT,
+    suggested_timing  TEXT,
+    suggested_actions TEXT,
+    coordinator_notes TEXT,
+    status            TEXT DEFAULT 'pending',
+    created_at        TEXT,
+    reviewed_at       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS demand_processed_sources (
+    source_type  TEXT,
+    source_id    TEXT,
+    processed_at TEXT,
+    PRIMARY KEY (source_type, source_id)
 );
 
 CREATE TABLE IF NOT EXISTS belief_states (
@@ -178,6 +231,164 @@ def mark_whatsapp_processed(ids: list[int]):
             "UPDATE whatsapp_inbox SET processed = 1 WHERE id = ?",
             [(i,) for i in ids],
         )
+
+
+def upsert_logistics_request(req: LogisticsRequest):
+    with _conn() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO logistics_requests VALUES
+               (:id,:source,:source_message_id,:requesting_org,:origin,:destination,
+                :commodity,:quantity,:unit,:deadline,:urgency,:notes,:status,
+                :confidence,:raw_text,:created_at)""",
+            {
+                "id": req.id, "source": req.source,
+                "source_message_id": req.source_message_id,
+                "requesting_org": req.requesting_org,
+                "origin": req.origin, "destination": req.destination,
+                "commodity": req.commodity, "quantity": req.quantity,
+                "unit": req.unit, "deadline": req.deadline,
+                "urgency": req.urgency, "notes": req.notes,
+                "status": req.status, "confidence": req.confidence,
+                "raw_text": req.raw_text, "created_at": req.created_at,
+            },
+        )
+
+
+def get_all_requests() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM logistics_requests ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_pending_requests() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM logistics_requests WHERE status='pending' ORDER BY created_at ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_request_status(request_id: str, status: str):
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE logistics_requests SET status=? WHERE id=?", (status, request_id)
+        )
+
+
+def upsert_demand_cluster(cluster: DemandCluster):
+    with _conn() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO demand_clusters VALUES
+               (:id,:request_ids,:corridor,:commodity,:time_window,
+                :total_quantity,:unit,:compatibility_notes,:status,:created_at)""",
+            {
+                "id": cluster.id,
+                "request_ids": json.dumps(cluster.request_ids),
+                "corridor": cluster.corridor, "commodity": cluster.commodity,
+                "time_window": cluster.time_window,
+                "total_quantity": cluster.total_quantity, "unit": cluster.unit,
+                "compatibility_notes": cluster.compatibility_notes,
+                "status": cluster.status, "created_at": cluster.created_at,
+            },
+        )
+
+
+def get_all_clusters() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM demand_clusters ORDER BY created_at DESC"
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["request_ids"] = json.loads(d["request_ids"] or "[]")
+        result.append(d)
+    return result
+
+
+def clear_demand_clusters():
+    with _conn() as conn:
+        conn.execute("DELETE FROM demand_clusters")
+        conn.execute("DELETE FROM consolidation_proposals WHERE status='pending'")
+
+
+def upsert_proposal(proposal: ConsolidationProposal):
+    with _conn() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO consolidation_proposals VALUES
+               (:id,:cluster_id,:proposal_text,:rationale,:estimated_saving,
+                :suggested_timing,:suggested_actions,:coordinator_notes,
+                :status,:created_at,:reviewed_at)""",
+            {
+                "id": proposal.id, "cluster_id": proposal.cluster_id,
+                "proposal_text": proposal.proposal_text,
+                "rationale": proposal.rationale,
+                "estimated_saving": proposal.estimated_saving,
+                "suggested_timing": proposal.suggested_timing,
+                "suggested_actions": json.dumps(proposal.suggested_actions),
+                "coordinator_notes": proposal.coordinator_notes,
+                "status": proposal.status, "created_at": proposal.created_at,
+                "reviewed_at": proposal.reviewed_at,
+            },
+        )
+
+
+def get_all_proposals() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM consolidation_proposals ORDER BY created_at DESC"
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["suggested_actions"] = json.loads(d["suggested_actions"] or "[]")
+        result.append(d)
+    return result
+
+
+def update_proposal_status(proposal_id: str, status: str, notes: str = ""):
+    with _conn() as conn:
+        conn.execute(
+            """UPDATE consolidation_proposals
+               SET status=?, coordinator_notes=?, reviewed_at=?
+               WHERE id=?""",
+            (status, notes, datetime.utcnow().isoformat(), proposal_id),
+        )
+
+
+def demand_source_already_processed(source_type: str, source_id: str) -> bool:
+    with _conn() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM demand_processed_sources WHERE source_type=? AND source_id=?",
+            (source_type, source_id),
+        ).fetchone()[0]
+    return count > 0
+
+
+def mark_demand_source_processed(source_type: str, source_id: str):
+    with _conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO demand_processed_sources VALUES (?,?,?)",
+            (source_type, source_id, datetime.utcnow().isoformat()),
+        )
+
+
+def get_unprocessed_demand_messages() -> list[dict]:
+    """Return distinct email/WhatsApp messages not yet checked for logistics requests."""
+    with _conn() as conn:
+        rows = conn.execute(
+            """SELECT DISTINCT s.source_type, s.source_id, s.raw_text, s.timestamp
+               FROM signals s
+               WHERE s.source_type IN ('email','whatsapp')
+               AND NOT EXISTS (
+                   SELECT 1 FROM demand_processed_sources d
+                   WHERE d.source_type=s.source_type AND d.source_id=s.source_id
+               )
+               ORDER BY s.timestamp DESC""",
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_belief_states() -> list[dict]:

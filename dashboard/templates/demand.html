@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demand Coordination — Humanitarian Sensing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#1a2744; --red:#c8102e; --orange:#e07b00; --amber:#b8860b; --green:#1a6b3c;
+      --gray-50:#f8f9fa; --gray-100:#f0f1f3; --gray-200:#e9ecef; --gray-300:#ced4da;
+      --gray-500:#6c757d; --gray-700:#495057; --gray-900:#212529; --white:#ffffff;
+    }
+    body { font-family:'Inter',sans-serif; background:var(--gray-50); color:var(--gray-900); font-size:14px; line-height:1.6; }
+    .header { background:var(--navy); color:var(--white); padding:16px 40px; display:flex; justify-content:space-between; align-items:center; }
+    .header-logo { display:flex; align-items:center; gap:12px; }
+    .cross { width:30px; height:30px; background:var(--red); display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:16px; border-radius:3px; }
+    .header-title { font-size:15px; font-weight:600; }
+    .header-sub { font-size:11px; font-weight:300; opacity:.65; margin-top:1px; }
+    .nav-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; font-size:11px; font-weight:600; border-radius:4px; text-decoration:none; letter-spacing:.5px; transition:opacity .15s; }
+    .nav-btn-outline { background:transparent; color:var(--white); border:1px solid rgba(255,255,255,.35); }
+    .nav-btn-outline:hover { background:rgba(255,255,255,.1); color:var(--white); }
+    .nav-btn-red { background:var(--red); color:var(--white); border:none; cursor:pointer; }
+    .nav-btn-red:hover { opacity:.85; }
+    .nav-btn-red:disabled { opacity:.45; cursor:not-allowed; }
+    .page { max-width:1140px; margin:0 auto; padding:28px 24px 64px; }
+    .stats-bar { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--gray-300); border:1px solid var(--gray-300); border-radius:8px; overflow:hidden; margin-bottom:28px; }
+    .stat { background:var(--white); padding:14px 20px; text-align:center; }
+    .stat-value { font-size:26px; font-weight:700; line-height:1; }
+    .stat-label { font-size:10px; color:var(--gray-500); margin-top:4px; text-transform:uppercase; letter-spacing:.8px; }
+    .stat-value.red   { color:var(--red); }
+    .stat-value.navy  { color:var(--navy); }
+    .stat-value.green { color:var(--green); }
+    .section-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; color:var(--gray-500); margin-bottom:10px; margin-top:28px; }
+    .card { background:var(--white); border:1px solid var(--gray-300); border-radius:8px; margin-bottom:10px; overflow:hidden; }
+    .card-bar { height:3px; background:var(--navy); }
+    .card-bar.pending  { background:var(--orange); }
+    .card-bar.accepted { background:var(--green); }
+    .card-bar.declined { background:var(--gray-300); }
+    .card-body { padding:16px 20px; }
+    .card-title { font-size:14px; font-weight:600; margin-bottom:4px; }
+    .card-meta  { font-size:12px; color:var(--gray-500); margin-bottom:12px; }
+    .proposal-text { font-size:13px; line-height:1.6; color:var(--gray-700); margin-bottom:8px; }
+    .rationale { font-size:12px; color:var(--gray-500); font-style:italic; margin-bottom:12px; }
+    .tag { display:inline-block; font-size:10px; font-weight:600; padding:2px 8px; border-radius:3px; margin-right:5px; }
+    .tag-saving  { background:#e8f5ee; color:var(--green); }
+    .tag-timing  { background:#e8eef8; color:var(--navy); }
+    .tag-pending  { background:#fff0e0; color:var(--orange); }
+    .tag-accepted { background:#e8f5ee; color:var(--green); }
+    .tag-declined { background:var(--gray-100); color:var(--gray-500); }
+    .tag-modified { background:#fff3cd; color:var(--amber); }
+    .actions-list { margin:8px 0 14px; padding-left:0; list-style:none; }
+    .actions-list li { font-size:12px; padding:4px 0 4px 16px; position:relative; border-bottom:1px solid var(--gray-100); color:var(--gray-700); }
+    .actions-list li:last-child { border-bottom:none; }
+    .actions-list li::before { content:"→"; position:absolute; left:0; color:var(--navy); font-weight:700; }
+    .review-form { border-top:1px solid var(--gray-100); padding-top:14px; margin-top:4px; }
+    .review-form textarea { width:100%; border:1px solid var(--gray-300); border-radius:4px; padding:8px 10px; font-size:12px; font-family:inherit; resize:vertical; min-height:56px; color:var(--gray-700); }
+    .review-form textarea:focus { outline:none; border-color:var(--navy); }
+    .btn-row { display:flex; gap:8px; margin-top:8px; }
+    .btn { padding:7px 16px; font-size:11px; font-weight:600; border-radius:4px; border:none; cursor:pointer; letter-spacing:.4px; }
+    .btn-accept  { background:var(--green); color:var(--white); }
+    .btn-decline { background:var(--gray-200); color:var(--gray-700); }
+    .btn-modify  { background:#fff3cd; color:var(--amber); border:1px solid #e0c060; }
+    .btn:hover { opacity:.85; }
+    .cluster-reqs { margin:10px 0; border:1px solid var(--gray-100); border-radius:4px; overflow:hidden; }
+    table { width:100%; border-collapse:collapse; }
+    th { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--gray-500); padding:6px 10px; border-bottom:1px solid var(--gray-200); text-align:left; background:var(--gray-50); }
+    td { font-size:12px; padding:7px 10px; border-bottom:1px solid var(--gray-100); color:var(--gray-700); vertical-align:top; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:var(--gray-50); }
+    .src-badge { font-size:10px; font-weight:600; text-transform:uppercase; padding:2px 6px; border-radius:3px; background:var(--gray-100); color:var(--navy); }
+    .urg-immediate { color:var(--red); font-weight:600; }
+    .urg-24h       { color:var(--orange); font-weight:600; }
+    .urg-72h       { color:var(--amber); }
+    .urg-low       { color:var(--green); }
+    .empty { text-align:center; padding:40px; color:var(--gray-500); font-size:13px; }
+    .intake-toggle { font-size:12px; font-weight:500; color:var(--navy); background:none; border:1px solid var(--gray-300); border-radius:4px; padding:6px 14px; cursor:pointer; margin-bottom:12px; }
+    .intake-toggle:hover { background:var(--gray-50); }
+    .intake-form { background:var(--white); border:1px solid var(--gray-300); border-radius:8px; padding:20px; margin-bottom:20px; display:none; }
+    .intake-form.open { display:block; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media (max-width:680px) { .form-grid { grid-template-columns:1fr; } }
+    .form-field { display:flex; flex-direction:column; gap:4px; }
+    .form-field.full { grid-column:1/-1; }
+    .form-field label { font-size:11px; font-weight:600; color:var(--gray-700); text-transform:uppercase; letter-spacing:.6px; }
+    .form-field input, .form-field select, .form-field textarea {
+      border:1px solid var(--gray-300); border-radius:4px; padding:7px 10px;
+      font-size:13px; font-family:inherit; color:var(--gray-900); }
+    .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline:none; border-color:var(--navy); }
+    .qty-row { display:flex; gap:8px; }
+    .qty-row input { flex:2; }
+    .qty-row input.unit { flex:1; }
+    .submit-btn { background:var(--navy); color:var(--white); border:none; border-radius:4px; padding:9px 22px; font-size:12px; font-weight:600; cursor:pointer; margin-top:4px; }
+    .submit-btn:hover { opacity:.88; }
+    .run-panel { position:fixed; bottom:0; left:0; right:0; background:#0d1a30; border-top:3px solid var(--red); padding:14px 28px 18px; transform:translateY(100%); transition:transform .3s ease; z-index:200; }
+    .run-panel.open { transform:translateY(0); }
+    .run-panel-title { font-size:12px; font-weight:600; color:var(--white); display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .spinner { width:13px; height:13px; border:2px solid rgba(255,255,255,.25); border-top-color:var(--white); border-radius:50%; animation:spin .75s linear infinite; flex-shrink:0; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .run-log { font-family:'Courier New',monospace; font-size:11px; color:rgba(255,255,255,.65); max-height:130px; overflow-y:auto; line-height:1.7; white-space:pre-wrap; }
+    a { color:var(--navy); } a:hover { color:var(--red); }
+    .reviewed-note { font-size:11px; color:var(--gray-500); font-style:italic; margin-top:8px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">
+    <div class="cross">+</div>
+    <div>
+      <div class="header-title">Demand Coordination</div>
+      <div class="header-sub">Request aggregation &amp; consolidation proposals</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="/" class="nav-btn nav-btn-outline">← Situation Brief</a>
+    <button id="run-btn" class="nav-btn nav-btn-red" onclick="runDemandCycle()">↻ Run demand cycle</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-value red">{{ stats.pending_proposals }}</div><div class="stat-label">Proposals Awaiting Action</div></div>
+    <div class="stat"><div class="stat-value navy">{{ stats.pending_requests }}</div><div class="stat-label">Pending Requests</div></div>
+    <div class="stat"><div class="stat-value navy">{{ stats.total_requests }}</div><div class="stat-label">Total Requests</div></div>
+    <div class="stat"><div class="stat-value green">{{ stats.accepted }}</div><div class="stat-label">Proposals Accepted</div></div>
+  </div>
+
+  {# ── Manual request intake ── #}
+  <div class="section-label">Submit a Logistics Request</div>
+  <button class="intake-toggle" onclick="toggleIntake(this)">+ Add request manually</button>
+  <div class="intake-form" id="intake-form">
+    <form method="POST" action="/demand/request">
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Requesting Organisation</label>
+          <input type="text" name="requesting_org" placeholder="e.g. UNICEF, WFP, ICRC">
+        </div>
+        <div class="form-field">
+          <label>Commodity</label>
+          <select name="commodity">
+            <option value="food">Food</option>
+            <option value="water">Water / WASH</option>
+            <option value="medical">Medical supplies</option>
+            <option value="shelter">Shelter / NFIs</option>
+            <option value="logistics">Logistics / transport</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>From (origin)</label>
+          <input type="text" name="origin" placeholder="e.g. Nairobi warehouse" required>
+        </div>
+        <div class="form-field">
+          <label>To (destination)</label>
+          <input type="text" name="destination" placeholder="e.g. Juba, South Sudan" required>
+        </div>
+        <div class="form-field">
+          <label>Quantity &amp; Unit</label>
+          <div class="qty-row">
+            <input type="number" name="quantity" placeholder="e.g. 5" step="any">
+            <input type="text" name="unit" class="unit" placeholder="MT / pallets / boxes">
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Deadline</label>
+          <input type="date" name="deadline">
+        </div>
+        <div class="form-field">
+          <label>Urgency</label>
+          <select name="urgency">
+            <option value="immediate">Immediate</option>
+            <option value="24h">Within 24h</option>
+            <option value="72h" selected>Within 72h</option>
+            <option value="low">Low</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="form-field full">
+          <label>Notes (coordinator context)</label>
+          <textarea name="notes" rows="2" placeholder="Road closures, special handling, contact person, trust constraints…"></textarea>
+        </div>
+      </div>
+      <button type="submit" class="submit-btn">Submit request</button>
+    </form>
+  </div>
+
+  {# ── Consolidation proposals ── #}
+  <div class="section-label">Consolidation Proposals</div>
+
+  {% set pending_proposals = proposals | selectattr("status","eq","pending") | list %}
+  {% set reviewed_proposals = proposals | rejectattr("status","eq","pending") | list %}
+
+  {% if not proposals %}
+  <div class="empty">No proposals yet — run the demand cycle to extract and cluster requests.</div>
+  {% else %}
+
+  {% if pending_proposals %}
+  {% for p in pending_proposals %}
+  <div class="card">
+    <div class="card-bar pending"></div>
+    <div class="card-body">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="card-title">{{ p.cluster.corridor if p.cluster else "Consolidation opportunity" }}</div>
+          <div class="card-meta">
+            {{ p.cluster.commodity|title if p.cluster else "" }}
+            {% if p.cluster and p.cluster.total_quantity %} &bull; {{ p.cluster.total_quantity }} {{ p.cluster.unit or "" }} combined{% endif %}
+            &bull; {{ p.cluster.request_ids|length if p.cluster else "?" }} requests
+          </div>
+        </div>
+        <span class="tag tag-pending">Awaiting review</span>
+      </div>
+
+      <p class="proposal-text">{{ p.proposal_text }}</p>
+      <p class="rationale">{{ p.rationale }}</p>
+
+      {% if p.estimated_saving %}<span class="tag tag-saving">{{ p.estimated_saving }}</span>{% endif %}
+      {% if p.suggested_timing %}<span class="tag tag-timing">{{ p.suggested_timing }}</span>{% endif %}
+
+      {% if p.suggested_actions %}
+      <ul class="actions-list" style="margin-top:10px">
+        {% for a in p.suggested_actions %}<li>{{ a }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if p.cluster and p.cluster.requests %}
+      <div class="cluster-reqs">
+        <table>
+          <thead><tr><th>Org</th><th>From</th><th>To</th><th>Commodity</th><th>Qty</th><th>Deadline</th><th>Urgency</th><th>Source</th></tr></thead>
+          <tbody>
+            {% for r in p.cluster.requests %}
+            <tr>
+              <td>{{ r.requesting_org or '—' }}</td>
+              <td>{{ r.origin }}</td>
+              <td>{{ r.destination }}</td>
+              <td>{{ r.commodity|title }}</td>
+              <td>{% if r.quantity %}{{ r.quantity }} {{ r.unit or '' }}{% else %}—{% endif %}</td>
+              <td>{{ r.deadline or '—' }}</td>
+              <td class="urg-{{ r.urgency }}">{{ r.urgency }}</td>
+              <td><span class="src-badge">{{ r.source }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <div class="review-form">
+        <form method="POST" action="/demand/proposal/{{ p.id }}">
+          <textarea name="notes" placeholder="Add coordinator notes: adjusted timing, constraints, approvals, reason for decline…"></textarea>
+          <div class="btn-row">
+            <button type="submit" name="status" value="accepted" class="btn btn-accept">✓ Accept</button>
+            <button type="submit" name="status" value="modified" class="btn btn-modify">✎ Accept with changes</button>
+            <button type="submit" name="status" value="declined" class="btn btn-decline">✕ Decline</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if reviewed_proposals %}
+  <div class="section-label" style="margin-top:24px">Reviewed Proposals</div>
+  {% for p in reviewed_proposals %}
+  <div class="card">
+    <div class="card-bar {{ p.status }}"></div>
+    <div class="card-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="card-title">{{ p.cluster.corridor if p.cluster else "Proposal" }}</div>
+          <div class="card-meta">{{ p.cluster.commodity|title if p.cluster else "" }}</div>
+        </div>
+        <span class="tag tag-{{ p.status }}">{{ p.status|upper }}</span>
+      </div>
+      <p class="proposal-text">{{ p.proposal_text }}</p>
+      {% if p.coordinator_notes %}<p class="reviewed-note">Coordinator note: {{ p.coordinator_notes }}</p>{% endif %}
+      {% if p.reviewed_at %}<p class="reviewed-note">Reviewed {{ p.reviewed_at[:10] }}</p>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% endif %}
+
+  {# ── All requests table ── #}
+  <div class="section-label" style="margin-top:32px">All Logistics Requests</div>
+  {% if not requests %}
+  <div class="empty">No requests yet. Add one manually above or run the demand cycle to extract from email/WhatsApp.</div>
+  {% else %}
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead><tr><th>Status</th><th>Org</th><th>From</th><th>To</th><th>Commodity</th><th>Qty</th><th>Deadline</th><th>Urgency</th><th>Source</th><th>Date</th><th></th></tr></thead>
+        <tbody>
+          {% for r in requests %}
+          <tr>
+            <td><span class="tag tag-{{ r.status }}">{{ r.status }}</span></td>
+            <td>{{ r.requesting_org or '—' }}</td>
+            <td>{{ r.origin }}</td>
+            <td>{{ r.destination }}</td>
+            <td>{{ r.commodity|title }}</td>
+            <td>{% if r.quantity %}{{ r.quantity }} {{ r.unit or '' }}{% else %}—{% endif %}</td>
+            <td>{{ r.deadline or '—' }}</td>
+            <td class="urg-{{ r.urgency }}">{{ r.urgency }}</td>
+            <td><span class="src-badge">{{ r.source }}</span></td>
+            <td style="white-space:nowrap">{{ r.created_at[:10] }}</td>
+            <td>
+              {% if r.status == 'pending' %}
+              <form method="POST" action="/demand/request/{{ r.id }}/cancel" style="display:inline">
+                <button type="submit" style="font-size:10px;color:var(--gray-500);background:none;border:none;cursor:pointer">✕</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<div id="run-panel" class="run-panel">
+  <div class="run-panel-title">
+    <span id="run-spinner" class="spinner" style="display:none"></span>
+    <span id="run-title">Demand cycle running…</span>
+  </div>
+  <div id="run-log" class="run-log"></div>
+</div>
+
+<script>
+  function toggleIntake(btn) {
+    const form = document.getElementById('intake-form');
+    const open = form.classList.toggle('open');
+    btn.textContent = open ? '− Hide form' : '+ Add request manually';
+  }
+
+  function runDemandCycle() {
+    const btn    = document.getElementById('run-btn');
+    const panel  = document.getElementById('run-panel');
+    const log    = document.getElementById('run-log');
+    const title  = document.getElementById('run-title');
+    const spinner = document.getElementById('run-spinner');
+
+    btn.disabled = true;
+    btn.textContent = '↻ Running…';
+    panel.classList.add('open');
+    log.textContent = '';
+    title.textContent = 'Demand cycle running…';
+    spinner.style.display = 'inline-block';
+
+    fetch('/demand/run', { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'already_running') {
+          title.textContent = 'Already running — please wait';
+          return;
+        }
+        const poll = setInterval(() => {
+          fetch('/demand/run/status')
+            .then(r => r.json())
+            .then(s => {
+              log.textContent = s.log.join('\n');
+              log.scrollTop = log.scrollHeight;
+              if (s.status === 'done' || s.status === 'error') {
+                clearInterval(poll);
+                spinner.style.display = 'none';
+                if (s.status === 'done') {
+                  title.textContent = '✓ Done — reloading…';
+                  setTimeout(() => location.reload(), 1500);
+                } else {
+                  title.textContent = '✗ Cycle failed — see log';
+                  btn.disabled = false;
+                  btn.textContent = '↻ Run demand cycle';
+                }
+              }
+            });
+        }, 2000);
+      });
+  }
+</script>
+
+</body>
+</html>

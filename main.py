@@ -11,10 +11,16 @@ Usage:
 import argparse
 import json
 
-from store.db import init_db, upsert_signal, upsert_belief_state, get_recent_signals, get_belief_states, source_already_processed, clear_belief_states
+from store.db import (init_db, upsert_signal, upsert_belief_state, get_recent_signals,
+                      get_belief_states, source_already_processed, clear_belief_states,
+                      upsert_logistics_request, get_pending_requests, upsert_demand_cluster,
+                      upsert_proposal, clear_demand_clusters, demand_source_already_processed,
+                      mark_demand_source_processed, get_unprocessed_demand_messages)
 from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp
 from extraction.agent import extract_signals
 from belief.aggregator import compute_belief_states
+from demand.extractor import extract_requests
+from demand.clustering import cluster_and_propose
 
 ALL_SOURCES = ["bbc", "gdelt", "reliefweb", "acled", "gdacs", "fewsnet", "hdx", "email", "whatsapp"]
 # Telegram excluded from default run — add "telegram" to --sources to enable
@@ -95,6 +101,38 @@ def cmd_report():
     print(json.dumps(beliefs, indent=2, default=str))
 
 
+def cmd_demand_extract() -> int:
+    messages = get_unprocessed_demand_messages()
+    print(f"[demand] Checking {len(messages)} message(s) for logistics requests...")
+    total = 0
+    for msg in messages:
+        requests = extract_requests(msg)
+        for req in requests:
+            upsert_logistics_request(req)
+            total += 1
+            print(f"  + request: {req.commodity} {req.origin} → {req.destination} ({req.requesting_org or '?'})")
+        mark_demand_source_processed(msg["source_type"], msg["source_id"])
+    print(f"[demand] Extracted {total} logistics request(s).")
+    return total
+
+
+def cmd_demand_cluster():
+    pending = get_pending_requests()
+    print(f"[demand] Clustering {len(pending)} pending request(s)...")
+    clear_demand_clusters()
+    clusters, proposals = cluster_and_propose(pending)
+    for c in clusters:
+        upsert_demand_cluster(c)
+    for p in proposals:
+        upsert_proposal(p)
+    print(f"[demand] {len(clusters)} cluster(s), {len(proposals)} proposal(s) generated.")
+
+
+def cmd_demand_run():
+    cmd_demand_extract()
+    cmd_demand_cluster()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Humanitarian Sensing Agent",
@@ -113,9 +151,12 @@ def main():
         help="Extract and print signals without writing to the database",
     )
 
-    sub.add_parser("beliefs", help="Recompute belief states from stored signals")
-    sub.add_parser("report",  help="Print current belief states as JSON")
-    sub.add_parser("run",     help="Full cycle: ingest all sources → beliefs → report")
+    sub.add_parser("beliefs",        help="Recompute belief states from stored signals")
+    sub.add_parser("report",         help="Print current belief states as JSON")
+    sub.add_parser("run",            help="Full cycle: ingest all sources → beliefs → report")
+    sub.add_parser("demand-extract", help="Extract logistics requests from email/WhatsApp messages")
+    sub.add_parser("demand-cluster", help="Cluster pending requests and generate proposals")
+    sub.add_parser("demand-run",     help="Full demand cycle: extract → cluster → propose")
 
     args = parser.parse_args()
     init_db()
@@ -130,6 +171,12 @@ def main():
         cmd_ingest(ALL_SOURCES)
         cmd_beliefs()
         cmd_report()
+    elif args.command == "demand-extract":
+        cmd_demand_extract()
+    elif args.command == "demand-cluster":
+        cmd_demand_cluster()
+    elif args.command == "demand-run":
+        cmd_demand_run()
 
 
 if __name__ == "__main__":

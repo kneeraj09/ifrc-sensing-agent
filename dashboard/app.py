@@ -12,7 +12,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import anthropic
 from flask import Flask, render_template, request, abort, redirect, jsonify
 from config import DB_PATH, ANTHROPIC_API_KEY, EXTRACTION_MODEL, TWILIO_AUTH_TOKEN
-from store.db import store_whatsapp_message
+from store.db import (store_whatsapp_message, upsert_logistics_request,
+                      get_all_requests, get_all_clusters, get_all_proposals,
+                      update_proposal_status, update_request_status)
+from models import LogisticsRequest
 from utils.regions import classify
 
 try:
@@ -334,6 +337,107 @@ def index():
         region_priority_groups=region_priority_groups,
         active_regions=active_regions,
     )
+
+
+@app.route("/demand")
+def demand():
+    requests  = get_all_requests()
+    clusters  = get_all_clusters()
+    proposals = get_all_proposals()
+
+    # Attach request details to each cluster
+    req_by_id = {r["id"]: r for r in requests}
+    for c in clusters:
+        c["requests"] = [req_by_id[rid] for rid in c["request_ids"] if rid in req_by_id]
+
+    # Attach cluster + requests to each proposal
+    cluster_by_id = {c["id"]: c for c in clusters}
+    for p in proposals:
+        p["cluster"] = cluster_by_id.get(p["cluster_id"], {})
+
+    stats = {
+        "total_requests":   len(requests),
+        "pending_requests": sum(1 for r in requests if r["status"] == "pending"),
+        "pending_proposals": sum(1 for p in proposals if p["status"] == "pending"),
+        "accepted":          sum(1 for p in proposals if p["status"] == "accepted"),
+    }
+    return render_template("demand.html", requests=requests, clusters=clusters,
+                           proposals=proposals, stats=stats)
+
+
+@app.route("/demand/request", methods=["POST"])
+def add_manual_request():
+    req = LogisticsRequest(
+        source="manual",
+        requesting_org=request.form.get("requesting_org") or None,
+        origin=request.form.get("origin", "").strip(),
+        destination=request.form.get("destination", "").strip(),
+        commodity=request.form.get("commodity", "").strip(),
+        quantity=float(request.form["quantity"]) if request.form.get("quantity") else None,
+        unit=request.form.get("unit") or None,
+        deadline=request.form.get("deadline") or None,
+        urgency=request.form.get("urgency", "unknown"),
+        notes=request.form.get("notes") or None,
+        confidence=1.0,
+    )
+    upsert_logistics_request(req)
+    return redirect("/demand")
+
+
+@app.route("/demand/proposal/<proposal_id>", methods=["POST"])
+def review_proposal(proposal_id):
+    status = request.form.get("status", "pending")
+    notes  = request.form.get("notes", "")
+    update_proposal_status(proposal_id, status, notes)
+    return redirect("/demand")
+
+
+@app.route("/demand/request/<request_id>/cancel", methods=["POST"])
+def cancel_request(request_id):
+    update_request_status(request_id, "cancelled")
+    return redirect("/demand")
+
+
+_demand_run_state = {"status": "idle", "log": []}
+_demand_run_lock  = threading.Lock()
+
+
+def _run_demand_background():
+    with _demand_run_lock:
+        _demand_run_state.update({"status": "running", "log": []})
+    lines = []
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "main.py", "demand-run"],
+            cwd=_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+        for line in proc.stdout:
+            lines.append(line.rstrip())
+            with _demand_run_lock:
+                _demand_run_state["log"] = lines[-60:]
+        proc.wait()
+        status = "done" if proc.returncode == 0 else "error"
+    except Exception as e:
+        lines.append(f"ERROR: {e}")
+        status = "error"
+    with _demand_run_lock:
+        _demand_run_state["status"] = status
+        _demand_run_state["log"]    = lines[-60:]
+
+
+@app.route("/demand/run", methods=["POST"])
+def run_demand_cycle():
+    with _demand_run_lock:
+        if _demand_run_state["status"] == "running":
+            return jsonify({"status": "already_running"}), 409
+    threading.Thread(target=_run_demand_background, daemon=True).start()
+    return jsonify({"status": "started"}), 202
+
+
+@app.route("/demand/run/status")
+def demand_run_status():
+    with _demand_run_lock:
+        return jsonify(_demand_run_state.copy())
 
 
 if __name__ == "__main__":
