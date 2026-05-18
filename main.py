@@ -110,7 +110,11 @@ def cmd_demand_extract() -> int:
     print(f"[demand] Checking {len(messages)} message(s) for logistics requests...")
     total = 0
     for msg in messages:
-        requests = extract_requests(msg)
+        try:
+            requests = extract_requests(msg)
+        except Exception as e:
+            print(f"  [demand-extract] skipping {msg['source_id']} — will retry next cycle ({e})")
+            continue
         for req in requests:
             upsert_logistics_request(req)
             total += 1

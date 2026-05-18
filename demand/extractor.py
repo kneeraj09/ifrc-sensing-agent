@@ -67,7 +67,7 @@ def extract_requests(message: dict) -> list[LogisticsRequest]:
         )
     except Exception as e:
         print(f"  [demand-extract] API error: {e}")
-        return []
+        raise  # let caller decide whether to mark processed
 
     tool_use = next((b for b in response.content if b.type == "tool_use"), None)
     if not tool_use:

@@ -473,8 +473,7 @@ def get_unprocessed_demand_messages() -> list[dict]:
                                                                     AS raw_text,
                    w.received_at                                    AS timestamp
             FROM   whatsapp_inbox w
-            WHERE  w.processed = 1
-            AND    NOT EXISTS (
+            WHERE  NOT EXISTS (
                        SELECT 1 FROM demand_processed_sources d
                        WHERE  d.source_type = 'whatsapp'
                        AND    d.source_id   = 'wa_' || w.id
