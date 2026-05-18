@@ -381,6 +381,35 @@ def demand():
                            proposals=proposals, stats=stats)
 
 
+@app.route("/demand/debug")
+def demand_debug():
+    """Diagnostic: show raw whatsapp_inbox and demand pipeline state."""
+    conn = _get_db()
+    inbox = [dict(r) for r in conn.execute(
+        "SELECT id, from_number, substr(body,1,100) as body, received_at, processed "
+        "FROM whatsapp_inbox ORDER BY received_at DESC LIMIT 20"
+    ).fetchall()]
+    processed = [dict(r) for r in conn.execute(
+        "SELECT * FROM demand_processed_sources ORDER BY processed_at DESC LIMIT 20"
+    ).fetchall()]
+    pending = [dict(r) for r in conn.execute(
+        """SELECT 'wa_'||w.id as source_id, substr(w.body,1,100) as body, w.received_at,
+                  w.processed as sensing_processed
+           FROM whatsapp_inbox w
+           WHERE NOT EXISTS (
+               SELECT 1 FROM demand_processed_sources d
+               WHERE d.source_type='whatsapp' AND d.source_id='wa_'||w.id
+           ) ORDER BY w.received_at DESC"""
+    ).fetchall()]
+    conn.close()
+    return jsonify({
+        "whatsapp_inbox_count": len(inbox),
+        "whatsapp_inbox": inbox,
+        "demand_processed_sources": processed,
+        "pending_for_demand_cycle": pending,
+    })
+
+
 @app.route("/demand/request", methods=["POST"])
 def add_manual_request():
     req = LogisticsRequest(
