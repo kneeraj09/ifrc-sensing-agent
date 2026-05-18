@@ -454,17 +454,45 @@ def mark_demand_source_processed(source_type: str, source_id: str):
 
 
 def get_unprocessed_demand_messages() -> list[dict]:
-    """Return distinct email/WhatsApp messages not yet checked for logistics requests."""
+    """Return messages not yet checked for logistics requests.
+
+    Two sources are combined:
+    1. WhatsApp inbox (processed=1 means sensing cycle has seen it) — uses original body.
+       This catches logistics requests that produced no humanitarian signal.
+    2. Email signals — uses signal raw_text (original email body is not separately stored).
+
+    Results are de-duplicated by source_id so the same WhatsApp message is not
+    returned twice even if it also produced a signal entry.
+    """
     with _conn() as conn:
         rows = conn.execute(
-            """SELECT DISTINCT s.source_type, s.source_id, s.raw_text, s.timestamp
-               FROM signals s
-               WHERE s.source_type IN ('email','whatsapp')
-               AND NOT EXISTS (
-                   SELECT 1 FROM demand_processed_sources d
-                   WHERE d.source_type=s.source_type AND d.source_id=s.source_id
-               )
-               ORDER BY s.timestamp DESC""",
+            """
+            SELECT 'whatsapp'                                       AS source_type,
+                   'wa_' || w.id                                    AS source_id,
+                   'WhatsApp from ' || w.from_number || ':' || char(10) || w.body
+                                                                    AS raw_text,
+                   w.received_at                                    AS timestamp
+            FROM   whatsapp_inbox w
+            WHERE  w.processed = 1
+            AND    NOT EXISTS (
+                       SELECT 1 FROM demand_processed_sources d
+                       WHERE  d.source_type = 'whatsapp'
+                       AND    d.source_id   = 'wa_' || w.id
+                   )
+
+            UNION
+
+            SELECT DISTINCT s.source_type, s.source_id, s.raw_text, s.timestamp
+            FROM   signals s
+            WHERE  s.source_type = 'email'
+            AND    NOT EXISTS (
+                       SELECT 1 FROM demand_processed_sources d
+                       WHERE  d.source_type = s.source_type
+                       AND    d.source_id   = s.source_id
+                   )
+
+            ORDER BY timestamp DESC
+            """,
         ).fetchall()
     return [dict(r) for r in rows]
 
