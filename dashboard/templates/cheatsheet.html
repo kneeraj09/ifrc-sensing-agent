@@ -78,6 +78,21 @@
     .back-bar { max-width: 1100px; margin: 16px auto 0; padding: 0 24px; }
     .back-link { font-size: 12px; color: var(--navy); text-decoration: none; font-weight: 500; }
     .back-link:hover { color: var(--red); }
+
+    /* ── Agent section divider ── */
+    .agent-divider { max-width: 1100px; margin: 36px auto 0; padding: 0 24px; }
+    .agent-divider-bar { background: var(--navy); color: var(--white); padding: 10px 18px; border-left: 5px solid var(--red); border-radius: 3px; display: flex; align-items: baseline; gap: 14px; }
+    .agent-divider-bar .agent-num { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; opacity: .6; }
+    .agent-divider-bar .agent-name { font-size: 15px; font-weight: 700; }
+    .agent-divider-bar .agent-desc { font-size: 12px; font-weight: 300; opacity: .65; font-style: italic; }
+
+    /* ── Scenario cards (allocation) ── */
+    .scenario-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; margin: 8px 0 14px; }
+    .scenario-card { background: var(--white); border: 1px solid var(--mgray); border-radius: 4px; padding: 8px 10px; font-size: 11px; }
+    .scenario-card .sc-name { font-weight: 700; color: var(--navy); font-size: 12px; margin-bottom: 2px; }
+    .scenario-card .sc-cr { color: var(--red); font-weight: 600; font-size: 11px; }
+    .scenario-card .sc-desc { color: var(--subtext); margin-top: 3px; line-height: 1.45; }
+    @media (max-width: 720px) { .scenario-grid { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
 <body>
@@ -235,9 +250,216 @@
   </div>
 </div>
 
+<!-- ════════════════ AGENT 2 ════════════════ -->
+<div class="agent-divider">
+  <div class="agent-divider-bar">
+    <span class="agent-num">Agent 2</span>
+    <span class="agent-name">Demand Aggregation &amp; Network Shaping</span>
+    <span class="agent-desc">Turns incoming logistics requests into consolidated shipment proposals</span>
+  </div>
+</div>
+
+<div class="page" style="padding-top:20px">
+  <div class="columns">
+
+    <!-- LEFT: capturing requests -->
+    <div class="col">
+
+      <div class="sec-header">How Requests Enter the System</div>
+      <ol class="steps">
+        <li data-n="1">Field staff send a logistics request by email, WhatsApp, or manual form in the Demand dashboard</li>
+        <li data-n="2">Claude reads each message and extracts a structured request (origin, destination, commodity, quantity, deadline)</li>
+        <li data-n="3">Requests with confidence &lt; 0.5 are discarded; the rest are stored as <em>pending</em></li>
+        <li data-n="4">Run the demand cycle to cluster pending requests and generate proposals</li>
+        <li data-n="5">Coordinator reviews each proposal: Accept, Decline, or Modify with notes</li>
+      </ol>
+
+      <div class="sec-header">Logistics Request Fields</div>
+      <table class="cs-table">
+        <thead><tr><th>Field</th><th>Meaning</th><th>Required?</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Origin</strong></td><td>Dispatch hub or warehouse location</td><td>Yes</td></tr>
+          <tr><td><strong>Destination</strong></td><td>Delivery location or beneficiary site</td><td>Yes</td></tr>
+          <tr><td><strong>Commodity</strong></td><td>What is being moved (food, water, shelter…)</td><td>Yes</td></tr>
+          <tr><td><strong>Quantity</strong></td><td>Volume (MT, units, cartons)</td><td>Optional</td></tr>
+          <tr><td><strong>Deadline</strong></td><td>Date by which delivery is needed</td><td>Optional</td></tr>
+          <tr><td><strong>Urgency</strong></td><td>immediate / 24h / 72h / unknown</td><td>Optional</td></tr>
+          <tr><td><strong>Requesting org</strong></td><td>Which organisation submitted the request</td><td>Optional</td></tr>
+          <tr><td><strong>Confidence</strong></td><td>Claude's certainty in extraction (0–1); always 1.0 for manual entry</td><td>Auto</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Request Statuses</div>
+      <table class="cs-table">
+        <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><strong>pending</strong></td><td>Received, awaiting clustering</td></tr>
+          <tr><td><strong>clustered</strong></td><td>Grouped into a consolidation cluster</td></tr>
+          <tr><td><strong>accepted</strong></td><td>Coordinator has accepted the consolidation</td></tr>
+          <tr><td><strong>cancelled</strong></td><td>Withdrawn — will not be clustered again</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+
+    <!-- RIGHT: clustering & proposals -->
+    <div class="col">
+
+      <div class="sec-header">How Clustering Works</div>
+      <p class="body-text">The agent groups pending requests by <strong>commodity class</strong> (food, medical, NFIs…) and <strong>destination</strong>. A cluster forms when 2 or more compatible requests share the same corridor. Claude then generates a plain-language consolidation proposal for each cluster.</p>
+      <ul class="bullets">
+        <li>Commodity class is normalised — "rice" and "food rations" both map to <em>food</em></li>
+        <li>Destination matching is case-insensitive ("Juba" = "juba")</li>
+        <li>Requests with different units (MT vs. cartons) can still be clustered if compatible</li>
+        <li>Clusters are rebuilt fresh each time the demand cycle runs — stale clusters are cleared first</li>
+      </ul>
+
+      <div class="sec-header">Consolidation Proposals</div>
+      <p class="body-text">Each proposal contains:</p>
+      <table class="cs-table">
+        <thead><tr><th>Element</th><th>What it tells you</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Proposal text</strong></td><td>Plain-language summary of the consolidation opportunity</td></tr>
+          <tr><td><strong>Rationale</strong></td><td>Why these requests can be combined (same corridor, commodity, timing)</td></tr>
+          <tr><td><strong>Estimated saving</strong></td><td>Approximate cost or effort reduction from combining shipments</td></tr>
+          <tr><td><strong>Suggested timing</strong></td><td>Recommended dispatch window based on the earliest deadline</td></tr>
+          <tr><td><strong>Suggested actions</strong></td><td>Step-by-step actions for the logistics coordinator</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Reviewing a Proposal</div>
+      <ol class="steps">
+        <li data-n="1"><strong>Accept</strong> — marks the cluster as accepted; constituent requests move to <em>accepted</em> status</li>
+        <li data-n="2"><strong>Decline</strong> — dismisses the proposal; requests remain pending for future cycles</li>
+        <li data-n="3"><strong>Modify</strong> — accept with coordinator notes that override or qualify the AI recommendation</li>
+      </ol>
+      <p class="body-text" style="margin-top:8px;font-style:italic">Manual requests always have confidence 1.0 and override extracted requests in ranking. Add coordinator notes to any proposal to create an audit trail for the decision.</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ AGENT 3 ════════════════ -->
+<div class="agent-divider">
+  <div class="agent-divider-bar">
+    <span class="agent-num">Agent 3</span>
+    <span class="agent-name">Allocation &amp; Ethical Tradeoff</span>
+    <span class="agent-desc">Newsvendor algorithm · 5 ethical scenarios · Human ratification</span>
+  </div>
+</div>
+
+<div class="page" style="padding-top:20px">
+  <div class="columns">
+
+    <!-- LEFT: algorithm & scenarios -->
+    <div class="col">
+
+      <div class="sec-header">The Newsvendor Algorithm</div>
+      <p class="body-text">The agent uses a <strong>multi-location newsvendor model</strong> to compute how to allocate a fixed stock across multiple locations under demand uncertainty. It uses the P10/P50/P90 demand estimates from Agent 1 as inputs.</p>
+      <p class="body-text navy">Optimal quantity per location: Q* = μ + σ × Φ⁻¹(critical ratio)</p>
+      <ul class="bullets">
+        <li><strong>μ</strong> = P50 demand estimate (central case)</li>
+        <li><strong>σ</strong> = demand spread, derived from P10–P90 range</li>
+        <li><strong>Critical ratio</strong> = the ethical stance on risk — higher means fewer shortfalls</li>
+        <li>An <strong>equity floor</strong> guarantees every location receives at least its P10 estimate</li>
+        <li>If total Q* exceeds available stock, residuals are scaled down proportionally after floors are paid</li>
+      </ul>
+
+      <div class="sec-header">The 5 Ethical Scenarios</div>
+      <div class="scenario-grid">
+        <div class="scenario-card">
+          <div class="sc-name">Speed</div>
+          <div class="sc-cr">CR 0.70</div>
+          <div class="sc-desc">Maximise reach — accept some shortfalls. Best when time is critical.</div>
+        </div>
+        <div class="scenario-card">
+          <div class="sc-name">Balanced</div>
+          <div class="sc-cr">CR 0.85</div>
+          <div class="sc-desc">Default. Balances coverage and efficiency across all locations.</div>
+        </div>
+        <div class="scenario-card">
+          <div class="sc-name">Equity</div>
+          <div class="sc-cr">CR 0.90</div>
+          <div class="sc-desc">Equal coverage priority. Best when location needs are similar.</div>
+        </div>
+        <div class="scenario-card">
+          <div class="sc-name">Critical First</div>
+          <div class="sc-cr">CR 0.85 + adj</div>
+          <div class="sc-desc">Adds risk bonus to critical/high locations (+0.08/+0.04 CR). Best with heterogeneous risk.</div>
+        </div>
+        <div class="scenario-card">
+          <div class="sc-name">Conservative</div>
+          <div class="sc-cr">CR 0.95</div>
+          <div class="sc-desc">Near-zero shortfall probability. Best when demand estimates are uncertain.</div>
+        </div>
+      </div>
+      <p class="body-text" style="margin-top:4px;font-style:italic">All 5 scenarios run simultaneously. The coordinator selects the one that best fits the operational context and ethical priorities.</p>
+
+      <div class="sec-header">Reading the Scenario Metrics</div>
+      <table class="cs-table">
+        <thead><tr><th>Metric</th><th>Meaning</th><th>Good value</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Equity score</strong></td><td>How evenly coverage is distributed (0–100, Gini-based)</td><td>Higher = more equal</td></tr>
+          <tr><td><strong>Avg coverage %</strong></td><td>Mean proportion of P50 need met across all locations</td><td>&gt; 80%</td></tr>
+          <tr><td><strong>Locations at risk</strong></td><td>Count of locations receiving &lt; 80% of estimated need</td><td>Lower = better</td></tr>
+          <tr><td><strong>Shortfall probability</strong></td><td>Chance actual demand exceeds allocated quantity at a location</td><td>&lt; 30%</td></tr>
+          <tr><td><strong>Total allocated</strong></td><td>Sum allocated across all locations — may be less than available stock</td><td>Close to available</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+
+    <!-- RIGHT: workflow & decision brief -->
+    <div class="col">
+
+      <div class="sec-header">Coordinator Workflow</div>
+      <ol class="steps">
+        <li data-n="1">Go to the <strong>Allocation</strong> dashboard and enter available stock, commodity, and unit</li>
+        <li data-n="2">Click <strong>Run allocation</strong> — all 5 scenarios are computed simultaneously from Agent 1 belief states</li>
+        <li data-n="3">Compare the 5 scenario cards: equity score, average coverage, locations at risk</li>
+        <li data-n="4">Click a scenario card to select it — Claude generates a 3-paragraph decision brief</li>
+        <li data-n="5">Optionally enter <strong>manual overrides</strong> for specific locations (your field judgement takes precedence)</li>
+        <li data-n="6">Review the brief: Situation, Ethical Rationale, Residual Risk</li>
+        <li data-n="7"><strong>Ratify</strong> the decision with a brief justification — this locks the run and creates an audit record</li>
+      </ol>
+
+      <div class="sec-header">The Decision Brief</div>
+      <p class="body-text">Claude generates a 3-paragraph brief for the selected scenario:</p>
+      <table class="cs-table">
+        <thead><tr><th>Paragraph</th><th>Content</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Situation</strong></td><td>What is being allocated, to whom, and under which scenario</td></tr>
+          <tr><td><strong>Ethical Rationale</strong></td><td>Tradeoffs made explicit — who benefits most, who is at risk of shortfall, alignment with the impartiality principle</td></tr>
+          <tr><td><strong>Residual Risk</strong></td><td>What could go wrong, assumptions being made, what to monitor — flags any location with &gt; 30% shortfall probability</td></tr>
+        </tbody>
+      </table>
+      <p class="body-text" style="margin-top:6px;font-style:italic">The brief ends with one sentence the coordinator can use to justify the decision to stakeholders. Coordinator overrides are flagged explicitly in the brief.</p>
+
+      <div class="sec-header">Coordinator Overrides</div>
+      <ul class="bullets">
+        <li>Enter a specific quantity for any location in the override fields after selecting a scenario</li>
+        <li>Overrides are visible in the decision brief and audit trail — they are not hidden</li>
+        <li>If an override reduces a location's allocation below its equity floor, the brief will flag this</li>
+        <li>Use overrides when you have field intelligence the system cannot access (e.g. access route closed, stock already pre-positioned)</li>
+      </ul>
+
+      <div class="sec-header">Key Principles</div>
+      <ul class="bullets">
+        <li>The algorithm is a <em>decision support tool</em>, not a decision-maker — the coordinator always ratifies</li>
+        <li>Allocation uses demand estimates from Agent 1 — run ingestion first for current data</li>
+        <li>A ratified run is locked; a new run must be started to revise an allocation</li>
+        <li>All runs are stored — the run history is accessible at the bottom of the Allocation dashboard</li>
+        <li>No allocation is distributed until explicitly ratified by a coordinator</li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
 <div class="doc-footer">
-  Ingestion: <code>python main.py run</code> &nbsp;|&nbsp;
-  Dashboard: <code>http://localhost:5050</code> &nbsp;|&nbsp;
+  Agent 1 — Sensing: <code>python main.py run</code> &nbsp;|&nbsp;
+  Agent 2 — Demand: <code>python main.py demand-run</code> &nbsp;|&nbsp;
+  Agent 3 — Allocation: <a href="/allocation" style="color:rgba(255,255,255,.5)">Allocation dashboard</a> &nbsp;|&nbsp;
   Signals window: 72 hours &nbsp;|&nbsp;
   Briefing refresh: 30 min
 </div>
