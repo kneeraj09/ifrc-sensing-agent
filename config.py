@@ -66,7 +66,7 @@ SIGNAL_HALFLIFE_HOURS = 48
 DB_PATH = os.getenv("SENSING_DB", "sensing_agent.db")
 
 # ReliefWeb app name (required by their API — v2 endpoint as of Nov 2025)
-RELIEFWEB_APP_NAME = "ifrc-sensing-agent"  # for future API registration
+RELIEFWEB_APP_NAME = "Algo8-HumanitarianLogisticsAgent26-8gaxs"
 
 # GDELT search terms — broadened to catch disaster, displacement, and access events
 GDELT_QUERY = (
