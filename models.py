@@ -30,6 +30,32 @@ class Signal(BaseModel):
     extractor_model: str = ""
 
 
+class StockPosition(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    commodity: str
+    depot_location: str
+    quantity: float
+    unit: str
+    as_of: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
+class AllocationRun(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    commodity: str
+    unit: str
+    available_stock: float
+    scenario_results: str = "{}"          # JSON: {scenario: [result dicts]}
+    scenario_metrics: str = "{}"          # JSON: {scenario: metric dict}
+    selected_scenario: Optional[str] = None
+    coordinator_overrides: Optional[str] = None   # JSON: {location: qty}
+    decision_brief: Optional[str] = None
+    status: str = "draft"                 # draft | ratified
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    ratified_at: Optional[str] = None
+    rationale: Optional[str] = None
+
+
 class LogisticsRequest(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     source: str = "manual"               # email | whatsapp | manual | erp

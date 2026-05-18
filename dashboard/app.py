@@ -14,8 +14,10 @@ from flask import Flask, render_template, request, abort, redirect, jsonify
 from config import DB_PATH, ANTHROPIC_API_KEY, EXTRACTION_MODEL, TWILIO_AUTH_TOKEN
 from store.db import (store_whatsapp_message, upsert_logistics_request,
                       get_all_requests, get_all_clusters, get_all_proposals,
-                      update_proposal_status, update_request_status)
-from models import LogisticsRequest
+                      update_proposal_status, update_request_status,
+                      upsert_stock_position, get_stock_positions,
+                      upsert_allocation_run, get_allocation_runs, get_latest_allocation_run)
+from models import LogisticsRequest, StockPosition, AllocationRun
 from utils.regions import classify
 
 try:
@@ -438,6 +440,159 @@ def run_demand_cycle():
 def demand_run_status():
     with _demand_run_lock:
         return jsonify(_demand_run_state.copy())
+
+
+# ── Allocation agent ────────────────────────────────────────────────────────
+
+@app.route("/allocation")
+def allocation():
+    from allocation.newsvendor import SCENARIOS
+    stock     = get_stock_positions()
+    runs      = get_allocation_runs()
+    latest    = runs[0] if runs else None
+    beliefs   = _get_beliefs_with_signals()
+    return render_template("allocation.html", stock=stock, runs=runs,
+                           latest=latest, beliefs=beliefs, scenarios=SCENARIOS)
+
+
+@app.route("/allocation/stock", methods=["POST"])
+def add_stock():
+    pos = StockPosition(
+        commodity=request.form.get("commodity", "").strip(),
+        depot_location=request.form.get("depot_location", "").strip(),
+        quantity=float(request.form.get("quantity", 0)),
+        unit=request.form.get("unit", "").strip(),
+        as_of=request.form.get("as_of") or None,
+    )
+    upsert_stock_position(pos)
+    return redirect("/allocation")
+
+
+@app.route("/allocation/run", methods=["POST"])
+def run_allocation():
+    import json as _json
+    from allocation.newsvendor import run_all_scenarios
+    from allocation.metrics import scenario_summary
+
+    commodity = request.form.get("commodity", "").strip()
+    unit      = request.form.get("unit", "units").strip()
+    try:
+        available_stock = float(request.form.get("available_stock", 0))
+    except ValueError:
+        available_stock = 0
+
+    beliefs = _get_beliefs_with_signals()
+    locations = []
+    for b in beliefs:
+        if commodity and b.get("commodity", "").lower() != commodity.lower():
+            continue
+        locations.append({
+            "location":     b["location"],
+            "commodity":    b.get("commodity", "general"),
+            "risk_level":   b.get("risk_level", "unknown"),
+            "demand_p10":   b.get("demand_p10") or 0.3,
+            "demand_p50":   b.get("demand_p50") or 0.5,
+            "demand_p90":   b.get("demand_p90") or 0.8,
+            "reference_qty": available_stock / max(len(beliefs), 1),
+        })
+
+    if not locations:
+        return redirect("/allocation")
+
+    all_results = run_all_scenarios(locations, available_stock)
+    metrics     = scenario_summary(all_results)
+
+    run = AllocationRun(
+        commodity=commodity or "all",
+        unit=unit,
+        available_stock=available_stock,
+        scenario_results=_json.dumps(all_results),
+        scenario_metrics=_json.dumps(metrics),
+    )
+    upsert_allocation_run(run)
+    return redirect(f"/allocation?run_id={run.id}")
+
+
+@app.route("/allocation/select", methods=["POST"])
+def select_scenario():
+    import json as _json
+    run_id   = request.form.get("run_id")
+    scenario = request.form.get("scenario")
+    runs     = get_allocation_runs()
+    run_data = next((r for r in runs if r["id"] == run_id), None)
+    if not run_data:
+        return redirect("/allocation")
+
+    overrides = {}
+    for key, val in request.form.items():
+        if key.startswith("override_") and val.strip():
+            loc = key[len("override_"):]
+            try:
+                overrides[loc] = float(val)
+            except ValueError:
+                pass
+
+    from allocation.briefing import generate_decision_brief
+    from allocation.metrics import compute_metrics
+    results  = run_data["scenario_results"].get(scenario, [])
+    metrics  = run_data["scenario_metrics"].get(scenario, {})
+
+    # Apply overrides to results for brief generation
+    brief = generate_decision_brief(
+        scenario_name=scenario,
+        allocations=results,
+        metrics=metrics,
+        available_stock=run_data["available_stock"],
+        unit=run_data["unit"],
+        commodity=run_data["commodity"],
+        coordinator_overrides=overrides if overrides else None,
+    )
+
+    run = AllocationRun(
+        id=run_id,
+        commodity=run_data["commodity"],
+        unit=run_data["unit"],
+        available_stock=run_data["available_stock"],
+        scenario_results=_json.dumps(run_data["scenario_results"]),
+        scenario_metrics=_json.dumps(run_data["scenario_metrics"]),
+        selected_scenario=scenario,
+        coordinator_overrides=_json.dumps(overrides) if overrides else None,
+        decision_brief=brief,
+        status="draft",
+        created_at=run_data["created_at"],
+    )
+    upsert_allocation_run(run)
+    return redirect(f"/allocation?run_id={run_id}")
+
+
+@app.route("/allocation/ratify", methods=["POST"])
+def ratify_allocation():
+    import json as _json
+    from datetime import datetime as _dt
+    run_id   = request.form.get("run_id")
+    rationale = request.form.get("rationale", "")
+    runs     = get_allocation_runs()
+    run_data = next((r for r in runs if r["id"] == run_id), None)
+    if not run_data:
+        return redirect("/allocation")
+
+    run = AllocationRun(
+        id=run_id,
+        commodity=run_data["commodity"],
+        unit=run_data["unit"],
+        available_stock=run_data["available_stock"],
+        scenario_results=_json.dumps(run_data["scenario_results"]),
+        scenario_metrics=_json.dumps(run_data["scenario_metrics"]),
+        selected_scenario=run_data.get("selected_scenario"),
+        coordinator_overrides=_json.dumps(run_data.get("coordinator_overrides") or {}),
+        decision_brief=run_data.get("decision_brief"),
+        status="ratified",
+        created_at=run_data["created_at"],
+        ratified_at=_dt.utcnow().isoformat(),
+        rationale=rationale,
+    )
+    upsert_allocation_run(run)
+    return redirect("/allocation")
 
 
 if __name__ == "__main__":

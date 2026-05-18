@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from datetime import datetime
-from models import Signal, BeliefState, LogisticsRequest, DemandCluster, ConsolidationProposal
+from models import Signal, BeliefState, LogisticsRequest, DemandCluster, ConsolidationProposal, StockPosition, AllocationRun
 from config import DB_PATH
 
 _SCHEMA = """
@@ -80,6 +80,32 @@ CREATE TABLE IF NOT EXISTS consolidation_proposals (
     status            TEXT DEFAULT 'pending',
     created_at        TEXT,
     reviewed_at       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS stock_positions (
+    id             TEXT PRIMARY KEY,
+    commodity      TEXT,
+    depot_location TEXT,
+    quantity       REAL,
+    unit           TEXT,
+    as_of          TEXT,
+    created_at     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS allocation_runs (
+    id                    TEXT PRIMARY KEY,
+    commodity             TEXT,
+    unit                  TEXT,
+    available_stock       REAL,
+    scenario_results      TEXT,
+    scenario_metrics      TEXT,
+    selected_scenario     TEXT,
+    coordinator_overrides TEXT,
+    decision_brief        TEXT,
+    status                TEXT DEFAULT 'draft',
+    created_at            TEXT,
+    ratified_at           TEXT,
+    rationale             TEXT
 );
 
 CREATE TABLE IF NOT EXISTS demand_processed_sources (
@@ -231,6 +257,58 @@ def mark_whatsapp_processed(ids: list[int]):
             "UPDATE whatsapp_inbox SET processed = 1 WHERE id = ?",
             [(i,) for i in ids],
         )
+
+
+def upsert_stock_position(pos: StockPosition):
+    with _conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO stock_positions VALUES (:id,:commodity,:depot_location,:quantity,:unit,:as_of,:created_at)",
+            {"id": pos.id, "commodity": pos.commodity, "depot_location": pos.depot_location,
+             "quantity": pos.quantity, "unit": pos.unit, "as_of": pos.as_of, "created_at": pos.created_at},
+        )
+
+
+def get_stock_positions() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute("SELECT * FROM stock_positions ORDER BY created_at DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def upsert_allocation_run(run: AllocationRun):
+    with _conn() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO allocation_runs VALUES
+               (:id,:commodity,:unit,:available_stock,:scenario_results,:scenario_metrics,
+                :selected_scenario,:coordinator_overrides,:decision_brief,:status,:created_at,
+                :ratified_at,:rationale)""",
+            {"id": run.id, "commodity": run.commodity, "unit": run.unit,
+             "available_stock": run.available_stock,
+             "scenario_results": run.scenario_results,
+             "scenario_metrics": run.scenario_metrics,
+             "selected_scenario": run.selected_scenario,
+             "coordinator_overrides": run.coordinator_overrides,
+             "decision_brief": run.decision_brief,
+             "status": run.status, "created_at": run.created_at,
+             "ratified_at": run.ratified_at, "rationale": run.rationale},
+        )
+
+
+def get_allocation_runs() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute("SELECT * FROM allocation_runs ORDER BY created_at DESC").fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["scenario_results"] = json.loads(d["scenario_results"] or "{}")
+        d["scenario_metrics"] = json.loads(d["scenario_metrics"] or "{}")
+        d["coordinator_overrides"] = json.loads(d["coordinator_overrides"] or "{}")
+        result.append(d)
+    return result
+
+
+def get_latest_allocation_run() -> dict | None:
+    runs = get_allocation_runs()
+    return runs[0] if runs else None
 
 
 def upsert_logistics_request(req: LogisticsRequest):

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Allocation & Ethical Tradeoffs — Humanitarian Sensing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#1a2744; --red:#c8102e; --orange:#e07b00; --amber:#b8860b; --green:#1a6b3c;
+      --gray-50:#f8f9fa; --gray-100:#f0f1f3; --gray-200:#e9ecef; --gray-300:#ced4da;
+      --gray-500:#6c757d; --gray-700:#495057; --gray-900:#212529; --white:#ffffff;
+    }
+    body { font-family:'Inter',sans-serif; background:var(--gray-50); color:var(--gray-900); font-size:14px; line-height:1.6; }
+    .header { background:var(--navy); color:var(--white); padding:16px 40px; display:flex; justify-content:space-between; align-items:center; }
+    .header-logo { display:flex; align-items:center; gap:12px; }
+    .cross { width:30px; height:30px; background:var(--red); display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:16px; border-radius:3px; }
+    .header-title { font-size:15px; font-weight:600; }
+    .header-sub { font-size:11px; font-weight:300; opacity:.65; margin-top:1px; }
+    .nav-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; font-size:11px; font-weight:600; border-radius:4px; text-decoration:none; letter-spacing:.5px; transition:opacity .15s; cursor:pointer; border:none; }
+    .nav-outline { background:transparent; color:var(--white); border:1px solid rgba(255,255,255,.35); }
+    .nav-outline:hover { background:rgba(255,255,255,.1); color:var(--white); }
+    .page { max-width:1200px; margin:0 auto; padding:28px 24px 80px; }
+    .section-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; color:var(--gray-500); margin-bottom:10px; margin-top:28px; }
+    .card { background:var(--white); border:1px solid var(--gray-300); border-radius:8px; margin-bottom:12px; overflow:hidden; }
+    .card-header { background:var(--navy); color:var(--white); padding:10px 18px; font-size:11px; font-weight:600; letter-spacing:.8px; text-transform:uppercase; }
+    .card-body { padding:18px 20px; }
+    .form-row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    .form-field { display:flex; flex-direction:column; gap:4px; }
+    .form-field label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--gray-700); }
+    .form-field input, .form-field select { border:1px solid var(--gray-300); border-radius:4px; padding:7px 10px; font-size:13px; font-family:inherit; color:var(--gray-900); min-width:140px; }
+    .form-field input:focus, .form-field select:focus { outline:none; border-color:var(--navy); }
+    .btn { padding:8px 18px; font-size:12px; font-weight:600; border-radius:4px; border:none; cursor:pointer; }
+    .btn-navy  { background:var(--navy); color:var(--white); }
+    .btn-green { background:var(--green); color:var(--white); }
+    .btn-red   { background:var(--red); color:var(--white); }
+    .btn-gray  { background:var(--gray-200); color:var(--gray-700); }
+    .btn:hover { opacity:.88; }
+    /* Scenario metric cards */
+    .scenario-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px; }
+    @media (max-width:900px) { .scenario-grid { grid-template-columns:repeat(2,1fr); } }
+    .sc-card { border:2px solid var(--gray-300); border-radius:8px; padding:14px; cursor:pointer; transition:border-color .15s; }
+    .sc-card:hover { border-color:var(--navy); }
+    .sc-card.selected { border-color:var(--red); background:#fff8f8; }
+    .sc-name { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--navy); margin-bottom:6px; }
+    .sc-desc { font-size:10px; color:var(--gray-500); margin-bottom:10px; line-height:1.4; }
+    .sc-metric { display:flex; justify-content:space-between; font-size:11px; padding:3px 0; border-bottom:1px solid var(--gray-100); }
+    .sc-metric:last-child { border-bottom:none; }
+    .sc-metric-label { color:var(--gray-500); }
+    .sc-metric-value { font-weight:600; color:var(--navy); }
+    .sc-metric-value.good { color:var(--green); }
+    .sc-metric-value.warn { color:var(--orange); }
+    .sc-metric-value.bad  { color:var(--red); }
+    /* Allocation comparison table */
+    .alloc-table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--gray-500); padding:7px 10px; border-bottom:2px solid var(--gray-200); text-align:left; background:var(--gray-50); white-space:nowrap; }
+    td { padding:7px 10px; border-bottom:1px solid var(--gray-100); color:var(--gray-700); vertical-align:middle; }
+    tr:hover td { background:var(--gray-50); }
+    tr:last-child td { border-bottom:none; }
+    .risk-badge { font-size:10px; font-weight:700; text-transform:uppercase; padding:2px 6px; border-radius:3px; }
+    .risk-critical { background:#fde8eb; color:var(--red); }
+    .risk-high     { background:#fff0e0; color:var(--orange); }
+    .risk-medium   { background:#fffbe0; color:var(--amber); }
+    .risk-low      { background:#e8f5ee; color:var(--green); }
+    .risk-unknown  { background:var(--gray-100); color:var(--gray-500); }
+    .cov-bar-wrap { display:flex; align-items:center; gap:6px; }
+    .cov-bar { height:6px; border-radius:3px; flex:0 0 60px; background:var(--gray-200); }
+    .cov-fill { height:6px; border-radius:3px; }
+    .cov-good { background:var(--green); }
+    .cov-warn { background:var(--orange); }
+    .cov-bad  { background:var(--red); }
+    .override-input { width:70px; border:1px solid var(--gray-300); border-radius:3px; padding:3px 6px; font-size:12px; text-align:right; }
+    .override-input:focus { outline:none; border-color:var(--navy); }
+    /* Decision brief */
+    .brief-box { background:var(--gray-50); border:1px solid var(--gray-200); border-radius:6px; padding:16px 18px; font-size:13px; line-height:1.7; color:var(--gray-700); white-space:pre-wrap; }
+    /* Run history */
+    .run-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--gray-100); font-size:12px; }
+    .run-row:last-child { border-bottom:none; }
+    .status-badge { font-size:10px; font-weight:700; text-transform:uppercase; padding:2px 7px; border-radius:3px; }
+    .status-draft     { background:#fff3cd; color:var(--amber); }
+    .status-ratified  { background:#e8f5ee; color:var(--green); }
+    a { color:var(--navy); } a:hover { color:var(--red); }
+    .empty { text-align:center; padding:40px; color:var(--gray-500); font-size:13px; }
+    .hint { font-size:11px; color:var(--gray-500); margin-top:6px; font-style:italic; }
+  </style>
+</head>
+<body>
+
+{% set run_id = request.args.get('run_id') %}
+{% set active_run = None %}
+{% for r in runs %}{% if r.id == run_id %}{% set active_run = r %}{% endif %}{% endfor %}
+{% if not active_run and runs %}{% set active_run = runs[0] %}{% endif %}
+
+<div class="header">
+  <div class="header-logo">
+    <div class="cross">+</div>
+    <div>
+      <div class="header-title">Allocation &amp; Ethical Tradeoffs</div>
+      <div class="header-sub">Newsvendor allocation · Pareto tradeoffs · Human ratification</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="/demand" class="nav-btn nav-outline">← Demand</a>
+    <a href="/" class="nav-btn nav-outline">Situation Brief</a>
+  </div>
+</div>
+
+<div class="page">
+
+  {# ── Stock position input ── #}
+  <div class="section-label">Available Stock</div>
+  <div class="card">
+    <div class="card-body">
+      <form method="POST" action="/allocation/stock">
+        <div class="form-row">
+          <div class="form-field">
+            <label>Commodity</label>
+            <select name="commodity">
+              <option value="food">Food</option>
+              <option value="water">Water / WASH</option>
+              <option value="medical">Medical</option>
+              <option value="shelter">Shelter / NFIs</option>
+              <option value="logistics">Logistics</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Depot / Origin</label>
+            <input type="text" name="depot_location" placeholder="e.g. Nairobi warehouse">
+          </div>
+          <div class="form-field">
+            <label>Quantity</label>
+            <input type="number" name="quantity" placeholder="e.g. 50" step="any">
+          </div>
+          <div class="form-field">
+            <label>Unit</label>
+            <input type="text" name="unit" placeholder="MT / pallets / boxes">
+          </div>
+          <div class="form-field">
+            <label>As of date</label>
+            <input type="date" name="as_of">
+          </div>
+          <div class="form-field" style="justify-content:flex-end">
+            <button type="submit" class="btn btn-navy">Add stock</button>
+          </div>
+        </div>
+      </form>
+      {% if stock %}
+      <table style="margin-top:14px">
+        <thead><tr><th>Commodity</th><th>Depot</th><th>Quantity</th><th>Unit</th><th>As of</th></tr></thead>
+        <tbody>
+          {% for s in stock %}
+          <tr>
+            <td>{{ s.commodity|title }}</td>
+            <td>{{ s.depot_location }}</td>
+            <td><strong>{{ s.quantity }}</strong></td>
+            <td>{{ s.unit }}</td>
+            <td>{{ s.as_of or s.created_at[:10] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Run allocation ── #}
+  <div class="section-label">Run Allocation</div>
+  <div class="card">
+    <div class="card-body">
+      <form method="POST" action="/allocation/run">
+        <div class="form-row">
+          <div class="form-field">
+            <label>Commodity to allocate</label>
+            <select name="commodity">
+              <option value="">All (use belief state weights)</option>
+              <option value="food">Food</option>
+              <option value="water">Water / WASH</option>
+              <option value="medical">Medical</option>
+              <option value="shelter">Shelter / NFIs</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Total available stock</label>
+            <input type="number" name="available_stock" placeholder="e.g. 50" step="any" required
+                   {% if stock %}value="{{ stock[0].quantity }}"{% endif %}>
+          </div>
+          <div class="form-field">
+            <label>Unit</label>
+            <input type="text" name="unit" placeholder="MT / pallets"
+                   {% if stock %}value="{{ stock[0].unit }}"{% endif %}>
+          </div>
+          <div class="form-field" style="justify-content:flex-end">
+            <button type="submit" class="btn btn-red">▶ Run all scenarios</button>
+          </div>
+        </div>
+      </form>
+      <p class="hint">Runs the newsvendor model across all 5 ethical scenarios using belief state demand distributions from Agent 1.</p>
+    </div>
+  </div>
+
+  {# ── Scenario comparison ── #}
+  {% if active_run and active_run.scenario_metrics %}
+  <div class="section-label">Scenario Comparison — Select one to proceed</div>
+  <form method="POST" action="/allocation/select" id="select-form">
+    <input type="hidden" name="run_id" value="{{ active_run.id }}">
+
+    <div class="scenario-grid">
+      {% for sc_key, sc_def in scenarios.items() %}
+      {% set m = active_run.scenario_metrics.get(sc_key, {}) %}
+      {% set is_selected = active_run.selected_scenario == sc_key %}
+      <div class="sc-card {% if is_selected %}selected{% endif %}" onclick="selectScenario('{{ sc_key }}', this)">
+        <div class="sc-name">{{ sc_def.label }}</div>
+        <div class="sc-desc">{{ sc_def.description }}</div>
+        <div class="sc-metric">
+          <span class="sc-metric-label">Equity score</span>
+          <span class="sc-metric-value {% if m.equity_score >= 80 %}good{% elif m.equity_score >= 60 %}warn{% else %}bad{% endif %}">{{ m.equity_score or '—' }}/100</span>
+        </div>
+        <div class="sc-metric">
+          <span class="sc-metric-label">Avg coverage</span>
+          <span class="sc-metric-value {% if m.avg_coverage_pct >= 80 %}good{% elif m.avg_coverage_pct >= 60 %}warn{% else %}bad{% endif %}">{{ m.avg_coverage_pct or '—' }}%</span>
+        </div>
+        <div class="sc-metric">
+          <span class="sc-metric-label">Locations at risk</span>
+          <span class="sc-metric-value {% if m.locations_at_risk == 0 %}good{% elif m.locations_at_risk <= 2 %}warn{% else %}bad{% endif %}">{{ m.locations_at_risk or 0 }}</span>
+        </div>
+        <div class="sc-metric">
+          <span class="sc-metric-label">Total allocated</span>
+          <span class="sc-metric-value">{{ m.total_allocated or '—' }} {{ active_run.unit }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── Allocation table with override inputs ── #}
+    {% set display_scenario = active_run.selected_scenario or (active_run.scenario_results.keys()|list|first) %}
+    {% set display_results = active_run.scenario_results.get(display_scenario, []) %}
+    {% if display_results %}
+    <div class="section-label">Location Allocations
+      <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--gray-700)">
+        — showing <strong>{{ scenarios[display_scenario].label if display_scenario in scenarios else display_scenario }}</strong>.
+        Adjust individual quantities below then click "Generate brief &amp; confirm".
+      </span>
+    </div>
+    <div class="card">
+      <div class="alloc-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>Risk</th>
+              <th>Est. demand</th>
+              {% for sc_key, sc_def in scenarios.items() %}
+              <th>{{ sc_def.label }}<br><span style="font-weight:400;text-transform:none">allocated</span></th>
+              {% endfor %}
+              <th>Override qty</th>
+              <th>Shortfall %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set locations_seen = [] %}
+            {% for r in active_run.scenario_results.get('balanced', display_results) %}
+            {% if r.location not in locations_seen %}
+            {% set _ = locations_seen.append(r.location) %}
+            <tr>
+              <td><strong>{{ r.location }}</strong></td>
+              <td><span class="risk-badge risk-{{ r.risk_level }}">{{ r.risk_level }}</span></td>
+              <td>{{ r.mean_demand }} {{ active_run.unit }}</td>
+              {% for sc_key in scenarios.keys() %}
+              {% set sc_results = active_run.scenario_results.get(sc_key, []) %}
+              {% set sc_r = sc_results | selectattr('location','eq',r.location) | first | default({}) %}
+              <td>
+                {% if sc_r %}
+                <div class="cov-bar-wrap">
+                  <div class="cov-bar"><div class="cov-fill {% if sc_r.coverage_pct >= 80 %}cov-good{% elif sc_r.coverage_pct >= 60 %}cov-warn{% else %}cov-bad{% endif %}" style="width:{{ [sc_r.coverage_pct, 100]|min }}%"></div></div>
+                  <span style="font-size:11px;white-space:nowrap">{{ sc_r.allocated }} ({{ sc_r.coverage_pct }}%)</span>
+                </div>
+                {% else %}—{% endif %}
+              </td>
+              {% endfor %}
+              <td>
+                <input type="number" name="override_{{ r.location }}" class="override-input"
+                       placeholder="—" step="any"
+                       value="{{ active_run.coordinator_overrides.get(r.location, '') if active_run.coordinator_overrides else '' }}">
+              </td>
+              <td>
+                {% set dr = display_results | selectattr('location','eq',r.location) | first | default({}) %}
+                {{ (dr.shortfall_prob * 100)|round(0)|int if dr else '—' }}%
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <input type="hidden" name="scenario" id="selected-scenario-input" value="{{ active_run.selected_scenario or 'balanced' }}">
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button type="submit" class="btn btn-navy">Generate brief &amp; confirm selection</button>
+      <span style="font-size:11px;color:var(--gray-500)">Selected: <strong id="selected-label">{{ scenarios[active_run.selected_scenario].label if active_run.selected_scenario and active_run.selected_scenario in scenarios else 'Balanced' }}</strong></span>
+    </div>
+  </form>
+  {% endif %}
+
+  {# ── Decision brief ── #}
+  {% if active_run and active_run.decision_brief %}
+  <div class="section-label">Decision Brief</div>
+  <div class="card">
+    <div class="card-header">Ethical Decision Brief — {{ scenarios[active_run.selected_scenario].label if active_run.selected_scenario and active_run.selected_scenario in scenarios else 'Draft' }}</div>
+    <div class="card-body">
+      <div class="brief-box">{{ active_run.decision_brief }}</div>
+
+      {% if active_run.status != 'ratified' %}
+      <form method="POST" action="/allocation/ratify" style="margin-top:18px">
+        <input type="hidden" name="run_id" value="{{ active_run.id }}">
+        <div class="form-field" style="margin-bottom:10px">
+          <label>Ratification notes</label>
+          <input type="text" name="rationale" placeholder="Who approved, any conditions, escalation path…" style="width:100%">
+        </div>
+        <button type="submit" class="btn btn-green">✓ Ratify this allocation</button>
+        <span style="font-size:11px;color:var(--gray-500);margin-left:10px">This locks the decision and logs it for audit.</span>
+      </form>
+      {% else %}
+      <div style="margin-top:14px;padding:10px 14px;background:#e8f5ee;border-radius:4px;font-size:12px;color:var(--green)">
+        ✓ Ratified on {{ active_run.ratified_at[:10] if active_run.ratified_at else '—' }}
+        {% if active_run.rationale %} — {{ active_run.rationale }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Run history ── #}
+  {% if runs|length > 1 %}
+  <div class="section-label">Allocation History</div>
+  <div class="card">
+    <div class="card-body" style="padding:0 18px">
+      {% for r in runs %}
+      <div class="run-row">
+        <div>
+          <strong>{{ r.commodity|title }}</strong> — {{ r.available_stock }} {{ r.unit }}
+          {% if r.selected_scenario and r.selected_scenario in scenarios %}
+          · {{ scenarios[r.selected_scenario].label }}{% endif %}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="status-badge status-{{ r.status }}">{{ r.status }}</span>
+          <span style="color:var(--gray-500)">{{ r.created_at[:10] }}</span>
+          <a href="/allocation?run_id={{ r.id }}" style="font-size:11px">View</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not runs %}
+  <div class="empty">No allocation runs yet. Add stock above and click "Run all scenarios".</div>
+  {% endif %}
+
+</div>
+
+<script>
+  function selectScenario(key, card) {
+    document.querySelectorAll('.sc-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    document.getElementById('selected-scenario-input').value = key;
+    const labels = {
+      speed: 'Speed Priority', balanced: 'Balanced', equity: 'Equity Focus',
+      critical_first: 'Critical Locations First', conservative: 'Conservative'
+    };
+    document.getElementById('selected-label').textContent = labels[key] || key;
+  }
+</script>
+
+</body>
+</html>
