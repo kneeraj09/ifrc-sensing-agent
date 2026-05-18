@@ -26,7 +26,12 @@ try:
 except ImportError:
     _TWILIO_AVAILABLE = False
 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 app = Flask(__name__)
+# Tell Flask to trust Railway's reverse-proxy forwarded headers so that
+# request.url is the correct public HTTPS URL (required for Twilio sig validation).
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 _anthropic = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 _RISK_ORDER   = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
@@ -308,12 +313,9 @@ def whatsapp_webhook():
             print("[webhook] twilio package not installed — skipping signature validation")
         else:
             validator = _TwilioValidator(TWILIO_AUTH_TOKEN)
-            # Reconstruct the public URL using forwarded headers (required when behind ngrok/proxy)
-            proto = request.headers.get("X-Forwarded-Proto", request.scheme)
-            host  = request.headers.get("X-Forwarded-Host", request.host)
-            url   = f"{proto}://{host}{request.path}"
-            sig   = request.headers.get("X-Twilio-Signature", "")
-            if not validator.validate(url, request.form, sig):
+            # ProxyFix above ensures request.url is the correct public HTTPS URL
+            sig = request.headers.get("X-Twilio-Signature", "")
+            if not validator.validate(request.url, request.form, sig):
                 abort(403)
 
     from_number = request.form.get("From", "")
