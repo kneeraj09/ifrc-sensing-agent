@@ -14,7 +14,7 @@ from flask import Flask, render_template, request, abort, redirect, jsonify
 from config import DB_PATH, ANTHROPIC_API_KEY, EXTRACTION_MODEL, TWILIO_AUTH_TOKEN
 from store.db import (store_whatsapp_message, upsert_logistics_request,
                       get_all_requests, get_all_clusters, get_all_proposals,
-                      update_proposal_status, update_request_status,
+                      update_proposal_status, update_request_status, bulk_update_request_status,
                       upsert_stock_position, get_stock_positions,
                       upsert_allocation_run, get_allocation_runs, get_latest_allocation_run)
 from models import LogisticsRequest, StockPosition, AllocationRun
@@ -436,6 +436,17 @@ def review_proposal(proposal_id):
     status = request.form.get("status", "pending")
     notes  = request.form.get("notes", "")
     update_proposal_status(proposal_id, status, notes)
+
+    # Propagate status to the underlying requests
+    proposals = get_all_proposals()
+    proposal  = next((p for p in proposals if p["id"] == proposal_id), None)
+    if proposal:
+        clusters   = get_all_clusters()
+        cluster    = next((c for c in clusters if c["id"] == proposal["cluster_id"]), None)
+        if cluster:
+            req_status = "accepted" if status == "accepted" else "pending"
+            bulk_update_request_status(cluster["request_ids"], req_status)
+
     return redirect("/demand")
 
 

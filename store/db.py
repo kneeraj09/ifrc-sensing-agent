@@ -355,6 +355,16 @@ def update_request_status(request_id: str, status: str):
         )
 
 
+def bulk_update_request_status(request_ids: list[str], status: str):
+    if not request_ids:
+        return
+    with _conn() as conn:
+        conn.executemany(
+            "UPDATE logistics_requests SET status=? WHERE id=?",
+            [(status, rid) for rid in request_ids],
+        )
+
+
 def upsert_demand_cluster(cluster: DemandCluster):
     with _conn() as conn:
         conn.execute(

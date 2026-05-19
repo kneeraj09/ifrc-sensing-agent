@@ -16,7 +16,7 @@ from store.db import (init_db, upsert_signal, upsert_belief_state, get_recent_si
                       upsert_logistics_request, get_pending_requests, upsert_demand_cluster,
                       upsert_proposal, clear_demand_clusters, demand_source_already_processed,
                       mark_demand_source_processed, get_unprocessed_demand_messages,
-                      mark_whatsapp_processed)
+                      mark_whatsapp_processed, bulk_update_request_status)
 from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp
 from extraction.agent import extract_signals
 from belief.aggregator import compute_belief_states
@@ -131,6 +131,7 @@ def cmd_demand_cluster():
     clusters, proposals = cluster_and_propose(pending)
     for c in clusters:
         upsert_demand_cluster(c)
+        bulk_update_request_status(c.request_ids, "clustered")
     for p in proposals:
         upsert_proposal(p)
     print(f"[demand] {len(clusters)} cluster(s), {len(proposals)} proposal(s) generated.")
