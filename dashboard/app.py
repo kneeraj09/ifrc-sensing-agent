@@ -543,46 +543,50 @@ def delete_stock(pos_id):
 @app.route("/allocation/run", methods=["POST"])
 def run_allocation():
     import json as _json
-    from allocation.newsvendor import run_all_scenarios
-    from allocation.metrics import scenario_summary
-
-    commodity = request.form.get("commodity", "").strip()
-    unit      = request.form.get("unit", "units").strip()
+    import traceback as _tb
     try:
-        available_stock = float(request.form.get("available_stock", 0))
-    except ValueError:
-        available_stock = 0
+        from allocation.newsvendor import run_all_scenarios
+        from allocation.metrics import scenario_summary
 
-    beliefs = _get_beliefs_with_signals()
-    locations = []
-    for b in beliefs:
-        if commodity and b.get("commodity", "").lower() != commodity.lower():
-            continue
-        locations.append({
-            "location":     b["location"],
-            "commodity":    b.get("commodity", "general"),
-            "risk_level":   b.get("risk_level", "unknown"),
-            "demand_p10":   b.get("demand_p10") or 0.3,
-            "demand_p50":   b.get("demand_p50") or 0.5,
-            "demand_p90":   b.get("demand_p90") or 0.8,
-            "reference_qty": available_stock / max(len(beliefs), 1),
-        })
+        commodity = request.form.get("commodity", "").strip()
+        unit      = request.form.get("unit", "units").strip()
+        try:
+            available_stock = float(request.form.get("available_stock", 0))
+        except ValueError:
+            available_stock = 0
 
-    if not locations:
-        return redirect("/allocation")
+        beliefs = _get_beliefs_with_signals()
+        locations = []
+        for b in beliefs:
+            if commodity and b.get("commodity", "").lower() != commodity.lower():
+                continue
+            locations.append({
+                "location":     b["location"],
+                "commodity":    b.get("commodity", "general"),
+                "risk_level":   b.get("risk_level", "unknown"),
+                "demand_p10":   b.get("demand_p10") or 0.3,
+                "demand_p50":   b.get("demand_p50") or 0.5,
+                "demand_p90":   b.get("demand_p90") or 0.8,
+                "reference_qty": available_stock / max(len(beliefs), 1),
+            })
 
-    all_results = run_all_scenarios(locations, available_stock)
-    metrics     = scenario_summary(all_results)
+        if not locations:
+            return redirect("/allocation")
 
-    run = AllocationRun(
-        commodity=commodity or "all",
-        unit=unit,
-        available_stock=available_stock,
-        scenario_results=_json.dumps(all_results),
-        scenario_metrics=_json.dumps(metrics),
-    )
-    upsert_allocation_run(run)
-    return redirect(f"/allocation?run_id={run.id}")
+        all_results = run_all_scenarios(locations, available_stock)
+        metrics     = scenario_summary(all_results)
+
+        run = AllocationRun(
+            commodity=commodity or "all",
+            unit=unit,
+            available_stock=available_stock,
+            scenario_results=_json.dumps(all_results),
+            scenario_metrics=_json.dumps(metrics),
+        )
+        upsert_allocation_run(run)
+        return redirect(f"/allocation?run_id={run.id}")
+    except Exception as _e:
+        return f"<pre style='padding:20px;color:red'><b>Allocation error:</b>\n{_tb.format_exc()}</pre>", 500
 
 
 @app.route("/allocation/select", methods=["POST"])
