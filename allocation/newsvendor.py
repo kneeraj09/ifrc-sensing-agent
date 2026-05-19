@@ -120,14 +120,14 @@ def run_newsvendor(locations: list[dict], available_stock: float, scenario_name:
             "location":       p["location"],
             "commodity":      p["commodity"],
             "risk_level":     p.get("risk_level", "unknown"),
-            "reference_qty":  round(p.get("reference_qty", 0), 2),
-            "mean_demand":    round(p["mu"], 2),
-            "allocated":      round(allocated, 2),
-            "coverage_ratio": round(min(cov, 2.0), 3),
-            "coverage_pct":   round(min(cov * 100, 200), 1),
-            "shortfall_prob": round(sf, 4),
-            "critical_ratio": round(p["cr"], 4),
-            "at_risk":        cov < 0.80,
+            "reference_qty":  round(float(p.get("reference_qty", 0)), 2),
+            "mean_demand":    round(float(p["mu"]), 2),
+            "allocated":      round(float(allocated), 2),
+            "coverage_ratio": round(float(min(cov, 2.0)), 3),
+            "coverage_pct":   round(float(min(cov * 100, 200)), 1),
+            "shortfall_prob": round(float(sf), 4),
+            "critical_ratio": round(float(p["cr"]), 4),
+            "at_risk":        bool(cov < 0.80),
         })
 
     return sorted(results, key=lambda x: x["coverage_ratio"])
