@@ -526,6 +526,7 @@ def add_stock():
     pos = StockPosition(
         commodity=request.form.get("commodity", "").strip(),
         depot_location=request.form.get("depot_location", "").strip(),
+        region=request.form.get("region", "").strip() or None,
         quantity=float(request.form.get("quantity", 0)),
         unit=request.form.get("unit", "").strip(),
         as_of=request.form.get("as_of") or None,
@@ -544,42 +545,71 @@ def delete_stock(pos_id):
 def run_allocation():
     import json as _json
     import traceback as _tb
+    from collections import defaultdict as _dd
     try:
-        from allocation.newsvendor import run_all_scenarios
+        from allocation.newsvendor import run_all_scenarios, SCENARIOS
         from allocation.metrics import scenario_summary
 
         commodity = request.form.get("commodity", "").strip()
         unit      = request.form.get("unit", "units").strip()
-        try:
-            available_stock = float(request.form.get("available_stock", 0))
-        except ValueError:
-            available_stock = 0
 
+        # Group stock positions by region for the selected commodity
+        all_stock = get_stock_positions()
+        stock_by_region = _dd(float)
+        for s in all_stock:
+            if commodity and s["commodity"].lower() != commodity.lower():
+                continue
+            region = s.get("region") or "Global"
+            stock_by_region[region] += s["quantity"]
+
+        if not stock_by_region:
+            return redirect("/allocation")
+
+        total_stock = sum(stock_by_region.values())
+
+        # Group beliefs by region
         beliefs = _get_beliefs_with_signals()
-        locations = []
+        beliefs_by_region = _dd(list)
         for b in beliefs:
             if commodity and b.get("commodity", "").lower() != commodity.lower():
                 continue
-            locations.append({
-                "location":     b["location"],
-                "commodity":    b.get("commodity", "general"),
-                "risk_level":   b.get("risk_level", "unknown"),
-                "demand_p10":   b.get("demand_p10") or 0.3,
-                "demand_p50":   b.get("demand_p50") or 0.5,
-                "demand_p90":   b.get("demand_p90") or 0.8,
-                "reference_qty": available_stock / max(len(beliefs), 1),
-            })
+            region = b.get("region") or "Global"
+            beliefs_by_region[region].append(b)
 
-        if not locations:
+        # Run newsvendor independently per region, then merge results
+        all_results = {name: [] for name in SCENARIOS}
+        for region, region_stock in sorted(stock_by_region.items()):
+            region_beliefs = beliefs_by_region.get(region, [])
+            if not region_beliefs:
+                continue
+            locations = [
+                {
+                    "location":     b["location"],
+                    "commodity":    b.get("commodity", "general"),
+                    "risk_level":   b.get("risk_level", "unknown"),
+                    "demand_p10":   b.get("demand_p10") or 0.3,
+                    "demand_p50":   b.get("demand_p50") or 0.5,
+                    "demand_p90":   b.get("demand_p90") or 0.8,
+                    "reference_qty": region_stock / len(region_beliefs),
+                    "region":       region,
+                }
+                for b in region_beliefs
+            ]
+            region_results = run_all_scenarios(locations, region_stock)
+            for sc_name, sc_results in region_results.items():
+                for r in sc_results:
+                    r["region"] = region
+                all_results[sc_name].extend(sc_results)
+
+        if not any(all_results.values()):
             return redirect("/allocation")
 
-        all_results = run_all_scenarios(locations, available_stock)
-        metrics     = scenario_summary(all_results)
+        metrics = scenario_summary(all_results)
 
         run = AllocationRun(
             commodity=commodity or "all",
             unit=unit,
-            available_stock=available_stock,
+            available_stock=total_stock,
             scenario_results=_json.dumps(all_results),
             scenario_metrics=_json.dumps(metrics),
         )

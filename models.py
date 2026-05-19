@@ -34,6 +34,7 @@ class StockPosition(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     commodity: str
     depot_location: str
+    region: Optional[str] = None
     quantity: float
     unit: str
     as_of: Optional[str] = None

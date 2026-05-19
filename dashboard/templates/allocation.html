@@ -130,6 +130,20 @@
             <input type="text" name="depot_location" placeholder="e.g. Nairobi warehouse">
           </div>
           <div class="form-field">
+            <label>Region</label>
+            <select name="region">
+              <option value="">— select —</option>
+              <option value="Africa">Africa</option>
+              <option value="Asia">Asia</option>
+              <option value="Middle East">Middle East</option>
+              <option value="Latin America">Latin America</option>
+              <option value="Europe">Europe</option>
+              <option value="North America">North America</option>
+              <option value="Oceania">Oceania</option>
+              <option value="Global">Global</option>
+            </select>
+          </div>
+          <div class="form-field">
             <label>Quantity</label>
             <input type="number" name="quantity" placeholder="e.g. 50" step="any">
           </div>
@@ -148,12 +162,13 @@
       </form>
       {% if stock %}
       <table style="margin-top:14px">
-        <thead><tr><th>Commodity</th><th>Depot</th><th>Quantity</th><th>Unit</th><th>As of</th><th></th></tr></thead>
+        <thead><tr><th>Commodity</th><th>Depot</th><th>Region</th><th>Quantity</th><th>Unit</th><th>As of</th><th></th></tr></thead>
         <tbody>
           {% for s in stock %}
           <tr>
             <td>{{ s.commodity|title }}</td>
             <td>{{ s.depot_location }}</td>
+            <td>{{ s.region or '—' }}</td>
             <td><strong>{{ s.quantity }}</strong></td>
             <td>{{ s.unit }}</td>
             <td>{{ s.as_of or s.created_at[:10] }}</td>
@@ -179,17 +194,12 @@
           <div class="form-field">
             <label>Commodity to allocate</label>
             <select name="commodity">
-              <option value="">All (use belief state weights)</option>
+              <option value="">All</option>
               <option value="food">Food</option>
               <option value="water">Water / WASH</option>
               <option value="medical">Medical</option>
               <option value="shelter">Shelter / NFIs</option>
             </select>
-          </div>
-          <div class="form-field">
-            <label>Total available stock</label>
-            <input type="number" name="available_stock" placeholder="e.g. 50" step="any" required
-                   {% if stock %}value="{{ stock[0].quantity }}"{% endif %}>
           </div>
           <div class="form-field">
             <label>Unit</label>
@@ -201,7 +211,7 @@
           </div>
         </div>
       </form>
-      <p class="hint">Runs the newsvendor model across all 5 ethical scenarios using belief state demand distributions from Agent 1.</p>
+      <p class="hint">Stock is read from the positions above, segmented by region. Each region's stock is allocated only to belief-state locations in that same region.</p>
     </div>
   </div>
 
@@ -253,6 +263,7 @@
         <table>
           <thead>
             <tr>
+              <th>Region</th>
               <th>Location</th>
               <th>Risk</th>
               <th>Est. demand</th>
@@ -269,6 +280,7 @@
             {% if r.location not in locations_seen %}
             {% set _ = locations_seen.append(r.location) %}
             <tr>
+              <td><span style="font-size:11px;color:var(--gray-500)">{{ r.get('region', '—') if r is mapping else '—' }}</span></td>
               <td><strong>{{ r.location }}</strong></td>
               <td><span class="risk-badge risk-{{ r.risk_level }}">{{ r.risk_level }}</span></td>
               <td>{{ r.mean_demand }} {{ active_run.unit }}</td>

@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS stock_positions (
     id             TEXT PRIMARY KEY,
     commodity      TEXT,
     depot_location TEXT,
+    region         TEXT,
     quantity       REAL,
     unit           TEXT,
     as_of          TEXT,
@@ -142,6 +143,9 @@ def _conn() -> sqlite3.Connection:
 def init_db():
     with _conn() as conn:
         conn.executescript(_SCHEMA)
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(stock_positions)")}
+        if "region" not in existing:
+            conn.execute("ALTER TABLE stock_positions ADD COLUMN region TEXT")
 
 
 def upsert_signal(signal: Signal):
@@ -262,9 +266,10 @@ def mark_whatsapp_processed(ids: list[int]):
 def upsert_stock_position(pos: StockPosition):
     with _conn() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO stock_positions VALUES (:id,:commodity,:depot_location,:quantity,:unit,:as_of,:created_at)",
+            "INSERT OR REPLACE INTO stock_positions VALUES (:id,:commodity,:depot_location,:region,:quantity,:unit,:as_of,:created_at)",
             {"id": pos.id, "commodity": pos.commodity, "depot_location": pos.depot_location,
-             "quantity": pos.quantity, "unit": pos.unit, "as_of": pos.as_of, "created_at": pos.created_at},
+             "region": pos.region, "quantity": pos.quantity, "unit": pos.unit,
+             "as_of": pos.as_of, "created_at": pos.created_at},
         )
 
 
