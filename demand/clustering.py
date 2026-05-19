@@ -17,6 +17,16 @@ _COMMODITY_MAP = {
 }
 
 
+def _normalise_destination(dest: str) -> str:
+    """Reduce destination to its first meaningful token for fuzzy matching.
+
+    'Juba, South Sudan' -> 'juba'
+    'Juba' -> 'juba'
+    'Entebbe warehouse' -> 'entebbe'
+    """
+    return dest.strip().lower().split(",")[0].split(" ")[0]
+
+
 def _commodity_class(commodity: str) -> str:
     c = commodity.lower()
     for keywords, cls in _COMMODITY_MAP.items():
@@ -89,7 +99,7 @@ def cluster_and_propose(requests: list[dict]) -> tuple[list[DemandCluster], list
     # Group by (commodity_class, destination)
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for r in requests:
-        key = (_commodity_class(r["commodity"]), r["destination"].strip().lower())
+        key = (_commodity_class(r["commodity"]), _normalise_destination(r["destination"]))
         groups[key].append(r)
 
     clusters, proposals = [], []

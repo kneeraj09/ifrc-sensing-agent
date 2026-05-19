@@ -309,10 +309,13 @@
             <td class="urg-{{ r.urgency }}">{{ r.urgency }}</td>
             <td><span class="src-badge">{{ r.source }}</span></td>
             <td style="white-space:nowrap">{{ r.created_at[:10] }}</td>
-            <td>
-              {% if r.status == 'pending' %}
+            <td style="white-space:nowrap">
+              {% if r.status in ('pending', 'clustered') %}
+              <form method="POST" action="/demand/request/{{ r.id }}/accept" style="display:inline">
+                <button type="submit" style="font-size:10px;color:var(--green);background:none;border:none;cursor:pointer;font-weight:600" title="Accept without consolidation">✓</button>
+              </form>
               <form method="POST" action="/demand/request/{{ r.id }}/cancel" style="display:inline">
-                <button type="submit" style="font-size:10px;color:var(--gray-500);background:none;border:none;cursor:pointer">✕</button>
+                <button type="submit" style="font-size:10px;color:var(--gray-500);background:none;border:none;cursor:pointer" title="Cancel request">✕</button>
               </form>
               {% endif %}
             </td>

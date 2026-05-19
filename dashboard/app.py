@@ -450,6 +450,12 @@ def review_proposal(proposal_id):
     return redirect("/demand")
 
 
+@app.route("/demand/request/<request_id>/accept", methods=["POST"])
+def accept_request(request_id):
+    update_request_status(request_id, "accepted")
+    return redirect("/demand")
+
+
 @app.route("/demand/request/<request_id>/cancel", methods=["POST"])
 def cancel_request(request_id):
     update_request_status(request_id, "cancelled")
