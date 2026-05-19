@@ -274,6 +274,11 @@ def get_stock_positions() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def delete_stock_position(pos_id: str):
+    with _conn() as conn:
+        conn.execute("DELETE FROM stock_positions WHERE id=?", (pos_id,))
+
+
 def upsert_allocation_run(run: AllocationRun):
     with _conn() as conn:
         conn.execute(

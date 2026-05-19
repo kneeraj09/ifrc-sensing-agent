@@ -15,7 +15,7 @@ from config import DB_PATH, ANTHROPIC_API_KEY, EXTRACTION_MODEL, TWILIO_AUTH_TOK
 from store.db import (store_whatsapp_message, upsert_logistics_request,
                       get_all_requests, get_all_clusters, get_all_proposals,
                       update_proposal_status, update_request_status, bulk_update_request_status,
-                      upsert_stock_position, get_stock_positions,
+                      upsert_stock_position, get_stock_positions, delete_stock_position,
                       upsert_allocation_run, get_allocation_runs, get_latest_allocation_run)
 from models import LogisticsRequest, StockPosition, AllocationRun
 from utils.regions import classify
@@ -531,6 +531,12 @@ def add_stock():
         as_of=request.form.get("as_of") or None,
     )
     upsert_stock_position(pos)
+    return redirect("/allocation")
+
+
+@app.route("/allocation/stock/<pos_id>/delete", methods=["POST"])
+def delete_stock(pos_id):
+    delete_stock_position(pos_id)
     return redirect("/allocation")
 
 

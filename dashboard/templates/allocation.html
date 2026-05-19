@@ -148,7 +148,7 @@
       </form>
       {% if stock %}
       <table style="margin-top:14px">
-        <thead><tr><th>Commodity</th><th>Depot</th><th>Quantity</th><th>Unit</th><th>As of</th></tr></thead>
+        <thead><tr><th>Commodity</th><th>Depot</th><th>Quantity</th><th>Unit</th><th>As of</th><th></th></tr></thead>
         <tbody>
           {% for s in stock %}
           <tr>
@@ -157,6 +157,11 @@
             <td><strong>{{ s.quantity }}</strong></td>
             <td>{{ s.unit }}</td>
             <td>{{ s.as_of or s.created_at[:10] }}</td>
+            <td>
+              <form method="POST" action="/allocation/stock/{{ s.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this stock entry?')">
+                <button type="submit" style="font-size:11px;color:var(--gray-500);background:none;border:none;cursor:pointer" title="Delete stock entry">✕</button>
+              </form>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
