@@ -30,8 +30,13 @@ TELEGRAM_CHANNELS = [
     c.strip() for c in os.getenv("TELEGRAM_CHANNELS", "").split(",") if c.strip()
 ]
 
+# IFRC GO — optional API token for authenticated access (richer data)
+# Leave blank to use the public unauthenticated API
+IFRC_GO_TOKEN = os.getenv("IFRC_GO_TOKEN", "")
+
 # Source veracity weights (0.0 – 1.0) — used in belief aggregation
 SOURCE_WEIGHTS = {
+    "ifrc_go":   0.95,   # IFRC's own operational data — highest trust
     "reliefweb": 0.90,
     "gdacs":     0.90,
     "fewsnet":   0.88,

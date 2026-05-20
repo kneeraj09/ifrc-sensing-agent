@@ -2,7 +2,7 @@
 Humanitarian Sensing Agent — CLI entry point.
 
 Usage:
-    python main.py ingest [--sources bbc gdelt reliefweb acled gdacs fewsnet hdx email whatsapp telegram] [--dry-run]
+    python main.py ingest [--sources bbc gdelt reliefweb acled gdacs fewsnet hdx ifrc_go email whatsapp telegram] [--dry-run]
     python main.py beliefs
     python main.py report
     python main.py run          # full cycle: ingest all sources → beliefs → report
@@ -17,13 +17,13 @@ from store.db import (init_db, upsert_signal, upsert_belief_state, get_recent_si
                       upsert_proposal, clear_demand_clusters, demand_source_already_processed,
                       mark_demand_source_processed, get_unprocessed_demand_messages,
                       mark_whatsapp_processed, bulk_update_request_status)
-from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp
+from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp, ifrc_go
 from extraction.agent import extract_signals
 from belief.aggregator import compute_belief_states
 from demand.extractor import extract_requests
 from demand.clustering import cluster_and_propose
 
-ALL_SOURCES = ["bbc", "gdelt", "reliefweb", "acled", "gdacs", "fewsnet", "hdx", "email", "whatsapp"]
+ALL_SOURCES = ["bbc", "gdelt", "reliefweb", "acled", "gdacs", "fewsnet", "hdx", "ifrc_go", "email", "whatsapp"]
 # Telegram excluded from default run — add "telegram" to --sources to enable
 # Email: skips cleanly if EMAIL_IMAP_HOST not set in .env
 # WhatsApp: skips cleanly if inbox is empty (messages arrive via /webhook/whatsapp)
@@ -36,6 +36,7 @@ _FETCH_MAP = {
     "gdacs":     ("alerts",    gdacs.fetch_alerts),
     "fewsnet":   ("alerts",    fewsnet.fetch_alerts),
     "hdx":       ("datasets",  hdx.fetch_datasets),
+    "ifrc_go":   ("reports",   ifrc_go.fetch_reports),
     "telegram":  ("messages",  telegram_ch.fetch_messages),
     "email":     ("reports",   email_imap.fetch_reports),
     "whatsapp":  ("messages",  whatsapp.fetch_messages),
