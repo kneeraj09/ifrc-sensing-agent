@@ -371,12 +371,15 @@
                 clearInterval(poll);
                 spinner.style.display = 'none';
                 if (s.status === 'done') {
-                  title.textContent = '✓ Done — reloading dashboard…';
-                  setTimeout(() => location.reload(), 1500);
+                  title.textContent = '✓ Done — scroll log to review, then close to reload';
+                  btn.disabled = false;
+                  btn.textContent = '✕ Close & reload';
+                  btn.onclick = () => location.reload();
                 } else {
                   title.textContent = '✗ Cycle failed — see log above';
                   btn.disabled = false;
-                  btn.textContent = '↻ Run cycle';
+                  btn.textContent = '↻ Retry';
+                  btn.onclick = runCycle;
                 }
               }
             });

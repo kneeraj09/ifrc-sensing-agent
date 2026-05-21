@@ -294,6 +294,27 @@ def run_status():
         return jsonify(_run_state.copy())
 
 
+@app.route("/debug/sources")
+def debug_sources():
+    """Show signal counts per source and the last 5 signals per source."""
+    conn = _get_db()
+    counts = [dict(r) for r in conn.execute(
+        "SELECT source_type, COUNT(*) as total, MAX(created_at) as latest "
+        "FROM signals GROUP BY source_type ORDER BY total DESC"
+    ).fetchall()]
+    samples = {}
+    for row in counts:
+        src = row["source_type"]
+        rows = conn.execute(
+            "SELECT source_id, location_name, country, commodity, signal_type, confidence, created_at "
+            "FROM signals WHERE source_type=? ORDER BY created_at DESC LIMIT 5",
+            (src,)
+        ).fetchall()
+        samples[src] = [dict(r) for r in rows]
+    conn.close()
+    return jsonify({"source_counts": counts, "samples": samples})
+
+
 @app.route("/run/reset", methods=["POST"])
 def run_reset():
     with _run_lock:
