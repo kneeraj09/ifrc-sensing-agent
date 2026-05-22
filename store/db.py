@@ -131,6 +131,22 @@ CREATE TABLE IF NOT EXISTS belief_states (
     human_override        TEXT,   -- JSON object
     last_updated          TEXT
 );
+
+CREATE TABLE IF NOT EXISTS gdacs_events (
+    id          TEXT PRIMARY KEY,
+    event_type  TEXT,
+    event_name  TEXT,
+    country     TEXT,
+    iso3        TEXT,
+    region      TEXT,
+    alert_level TEXT,
+    alert_score REAL,
+    from_date   TEXT,
+    to_date     TEXT,
+    lat         REAL,
+    lon         REAL,
+    created_at  TEXT
+);
 """
 
 
@@ -522,3 +538,51 @@ def get_belief_states() -> list[dict]:
             "SELECT * FROM belief_states ORDER BY last_updated DESC"
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── GDACS historical events ──────────────────────────────────────────────────
+
+def upsert_gdacs_event(event: dict):
+    """Insert or replace a GDACS historical event record."""
+    with _conn() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO gdacs_events VALUES
+               (:id,:event_type,:event_name,:country,:iso3,:region,
+                :alert_level,:alert_score,:from_date,:to_date,:lat,:lon,:created_at)""",
+            {
+                "id":          event.get("id", ""),
+                "event_type":  event.get("event_type", ""),
+                "event_name":  event.get("event_name", ""),
+                "country":     event.get("country", ""),
+                "iso3":        event.get("iso3", ""),
+                "region":      event.get("region", ""),
+                "alert_level": event.get("alert_level", ""),
+                "alert_score": event.get("alert_score", 0.0),
+                "from_date":   event.get("from_date", ""),
+                "to_date":     event.get("to_date", ""),
+                "lat":         event.get("lat"),
+                "lon":         event.get("lon"),
+                "created_at":  datetime.utcnow().isoformat(),
+            },
+        )
+
+
+def get_gdacs_events(region: str = None) -> list[dict]:
+    """Return all stored GDACS events, optionally filtered by region."""
+    with _conn() as conn:
+        if region:
+            rows = conn.execute(
+                "SELECT * FROM gdacs_events WHERE region=? ORDER BY from_date DESC",
+                (region,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM gdacs_events ORDER BY from_date DESC"
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_gdacs_event_count() -> int:
+    """Return the total number of stored GDACS events."""
+    with _conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM gdacs_events").fetchone()[0]

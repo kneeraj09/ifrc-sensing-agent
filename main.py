@@ -16,8 +16,10 @@ from store.db import (init_db, upsert_signal, upsert_belief_state, get_recent_si
                       upsert_logistics_request, get_pending_requests, upsert_demand_cluster,
                       upsert_proposal, clear_demand_clusters, demand_source_already_processed,
                       mark_demand_source_processed, get_unprocessed_demand_messages,
-                      mark_whatsapp_processed, bulk_update_request_status)
+                      mark_whatsapp_processed, bulk_update_request_status,
+                      upsert_gdacs_event, get_gdacs_event_count)
 from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp, ifrc_go
+from connectors.gdacs_historical import fetch_historical
 from extraction.agent import extract_signals
 from belief.aggregator import compute_belief_states
 from demand.extractor import extract_requests
@@ -143,6 +145,19 @@ def cmd_demand_run():
     cmd_demand_cluster()
 
 
+def cmd_gdacs_history(years_back: int = 5, regions: list[str] = None) -> list:
+    """Fetch multi-year GDACS events and upsert into the gdacs_events table."""
+    if regions is None:
+        regions = ["Africa"]
+    print(f"[gdacs-history] Fetching {years_back} year(s) of GDACS events for: {', '.join(regions)}")
+    events = fetch_historical(years_back=years_back, target_regions=regions)
+    for ev in events:
+        upsert_gdacs_event(ev)
+    total = get_gdacs_event_count()
+    print(f"[gdacs-history] Done. {len(events)} event(s) upserted. Total in DB: {total}")
+    return events
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Humanitarian Sensing Agent",
@@ -168,6 +183,13 @@ def main():
     sub.add_parser("demand-cluster", help="Cluster pending requests and generate proposals")
     sub.add_parser("demand-run",     help="Full demand cycle: extract → cluster → propose")
 
+    p_hist = sub.add_parser("gdacs-history", help="Load multi-year GDACS historical events (risk baseline)")
+    p_hist.add_argument("--years-back", type=int, default=5,
+                        help="Number of past calendar years to fetch (default: 5)")
+    p_hist.add_argument("--regions", nargs="+", default=["Africa"],
+                        metavar="REGION",
+                        help="Regions to fetch (default: Africa)")
+
     args = parser.parse_args()
     init_db()
 
@@ -187,6 +209,8 @@ def main():
         cmd_demand_cluster()
     elif args.command == "demand-run":
         cmd_demand_run()
+    elif args.command == "gdacs-history":
+        cmd_gdacs_history(years_back=args.years_back, regions=args.regions)
 
 
 if __name__ == "__main__":

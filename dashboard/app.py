@@ -16,7 +16,8 @@ from store.db import (store_whatsapp_message, upsert_logistics_request,
                       get_all_requests, get_all_clusters, get_all_proposals,
                       update_proposal_status, update_request_status, bulk_update_request_status,
                       upsert_stock_position, get_stock_positions, delete_stock_position,
-                      upsert_allocation_run, get_allocation_runs, get_latest_allocation_run)
+                      upsert_allocation_run, get_allocation_runs, get_latest_allocation_run,
+                      get_gdacs_events, get_gdacs_event_count)
 from models import LogisticsRequest, StockPosition, AllocationRun
 from utils.regions import classify
 
@@ -720,6 +721,70 @@ def ratify_allocation():
     )
     upsert_allocation_run(run)
     return redirect("/allocation")
+
+
+# ── Hazard baseline (GDACS historical) ─────────────────────────────────────
+
+_hazard_state = {"status": "idle", "log": []}
+_hazard_lock  = threading.Lock()
+
+
+def _run_gdacs_history_background():
+    with _hazard_lock:
+        _hazard_state.update({"status": "running", "log": []})
+    lines = []
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "main.py", "gdacs-history"],
+            cwd=_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+        try:
+            stdout, _ = proc.communicate(timeout=300)
+            lines = [l.rstrip() for l in stdout.splitlines()]
+            status = "done" if proc.returncode == 0 else "error"
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, _ = proc.communicate()
+            lines = [l.rstrip() for l in stdout.splitlines()]
+            lines.append("[timeout] GDACS history load killed after 300s")
+            status = "error"
+    except Exception as e:
+        lines.append(f"ERROR: {e}")
+        status = "error"
+    with _hazard_lock:
+        _hazard_state["status"] = status
+        _hazard_state["log"]    = lines[-60:]
+
+
+@app.route("/gdacs-history", methods=["POST"])
+def trigger_gdacs_history():
+    with _hazard_lock:
+        if _hazard_state["status"] == "running":
+            return jsonify({"status": "already_running"}), 409
+    threading.Thread(target=_run_gdacs_history_background, daemon=True).start()
+    return jsonify({"status": "started"}), 202
+
+
+@app.route("/gdacs-history/status")
+def gdacs_history_status():
+    with _hazard_lock:
+        return jsonify(_hazard_state.copy())
+
+
+@app.route("/hazard")
+def hazard():
+    from risk.baseline import compute_hazard_profiles
+    events       = get_gdacs_events()
+    event_count  = get_gdacs_event_count()
+    profiles     = compute_hazard_profiles(events, years_back=5)
+    with _hazard_lock:
+        load_state = _hazard_state.copy()
+    return render_template(
+        "hazard.html",
+        profiles=profiles,
+        event_count=event_count,
+        load_state=load_state,
+    )
 
 
 if __name__ == "__main__":

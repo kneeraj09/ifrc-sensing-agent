@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hazard Baseline — IFRC Sensing Agent</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --ifrc-red:  #C8102E;
+      --ifrc-navy: #1A2744;
+    }
+    body { background: #f4f6f9; font-family: 'Segoe UI', sans-serif; font-size: 0.92rem; }
+
+    /* ── Navbar ── */
+    .navbar { background: var(--ifrc-navy) !important; }
+    .navbar-brand { color: #fff !important; font-weight: 700; letter-spacing: 0.5px; }
+    .nav-link { color: rgba(255,255,255,.75) !important; }
+    .nav-link:hover, .nav-link.active { color: #fff !important; }
+
+    /* ── Page header ── */
+    .page-header {
+      background: var(--ifrc-navy);
+      color: #fff;
+      padding: 1.4rem 0 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .page-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+    .page-header p  { margin: 0.2rem 0 0; color: rgba(255,255,255,.7); font-size: 0.85rem; }
+
+    /* ── Stat cards ── */
+    .stat-card {
+      background: #fff;
+      border-radius: 8px;
+      border-left: 4px solid var(--ifrc-red);
+      padding: 1rem 1.2rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .stat-card .num { font-size: 2rem; font-weight: 700; color: var(--ifrc-navy); line-height: 1; }
+    .stat-card .lbl { color: #888; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; }
+
+    /* ── Load panel ── */
+    .load-panel {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Table ── */
+    .hazard-table thead th {
+      background: var(--ifrc-navy);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border: none;
+      position: sticky;
+      top: 0;
+      white-space: nowrap;
+    }
+    .hazard-table tbody tr:hover { background: #f0f4ff; }
+    .hazard-table td { vertical-align: middle; padding: 0.55rem 0.75rem; }
+
+    /* ── Tier badges ── */
+    .tier-critical { background: #C8102E; color: #fff; }
+    .tier-high     { background: #e67e22; color: #fff; }
+    .tier-medium   { background: #f1c40f; color: #1A2744; }
+    .tier-low      { background: #27ae60; color: #fff; }
+    .tier-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* ── Type pills ── */
+    .type-pill {
+      display: inline-block;
+      background: #e8ecf5;
+      color: var(--ifrc-navy);
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 0.72rem;
+      margin: 1px;
+      font-weight: 600;
+    }
+    .type-pill.EQ { background: #fde8e8; color: #c0392b; }
+    .type-pill.FL { background: #e8f1fd; color: #2471a3; }
+    .type-pill.TC { background: #e8f5e9; color: #1e8449; }
+    .type-pill.DR { background: #fef9e7; color: #9a7d0a; }
+    .type-pill.WF { background: #fdf2e9; color: #e67e22; }
+    .type-pill.VO { background: #f5e6d3; color: #884ea0; }
+
+    /* ── Severity bar ── */
+    .sev-bar-wrap { width: 90px; display: inline-block; vertical-align: middle; }
+    .sev-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: #ddd;
+      overflow: hidden;
+    }
+    .sev-bar-fill { height: 100%; border-radius: 4px; }
+
+    /* ── Log box ── */
+    #hazardLog {
+      background: #0d1117;
+      color: #a8d8a8;
+      font-family: monospace;
+      font-size: 0.78rem;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 0.75rem;
+      display: none;
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #aaa;
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/">🌍 IFRC Sensing Agent</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="/demand">Demand</a></li>
+        <li class="nav-item"><a class="nav-link" href="/allocation">Allocation</a></li>
+        <li class="nav-item"><a class="nav-link active" href="/hazard">Hazard Baseline</a></li>
+        <li class="nav-item"><a class="nav-link" href="/cheatsheet">Cheatsheet</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <div class="container-fluid px-4">
+    <h1>🗺️ Historical Hazard Baseline</h1>
+    <p>Multi-year GDACS event archive — Africa &amp; IFRC priority regions &nbsp;·&nbsp;
+       <span id="eventCount">{{ event_count }}</span> events stored</p>
+  </div>
+</div>
+
+<div class="container-fluid px-4">
+
+  <!-- ── Summary stats ── -->
+  {% set top = profiles[0] if profiles else None %}
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="num">{{ event_count }}</div>
+        <div class="lbl">Total events</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="num">{{ profiles|length }}</div>
+        <div class="lbl">Countries tracked</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="num">5</div>
+        <div class="lbl">Years of history</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="num" style="font-size:1.3rem;">
+          {% if top %}{{ top.country }}{% else %}—{% endif %}
+        </div>
+        <div class="lbl">Highest-risk country</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Load panel ── -->
+  <div class="load-panel">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div>
+        <strong>Load / refresh historical data</strong>
+        <span class="text-muted ms-2" style="font-size:0.82rem;">
+          Fetches 5 years of GDACS events for Africa from the GDACS REST API (~30s)
+        </span>
+      </div>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <span id="hazardStatusBadge"
+              class="badge {% if load_state.status == 'running' %}bg-warning text-dark
+                           {% elif load_state.status == 'done' %}bg-success
+                           {% elif load_state.status == 'error' %}bg-danger
+                           {% else %}bg-secondary{% endif %}">
+          {{ load_state.status | upper }}
+        </span>
+        <button id="loadBtn" class="btn btn-sm btn-danger"
+                onclick="triggerLoad()"
+                {% if load_state.status == 'running' %}disabled{% endif %}>
+          {% if load_state.status == 'running' %}
+            <span class="spinner-border spinner-border-sm me-1"></span>Loading…
+          {% else %}
+            ⬇ Load GDACS History
+          {% endif %}
+        </button>
+        {% if load_state.log %}
+        <button class="btn btn-sm btn-outline-secondary" onclick="toggleLog()">Log</button>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if load_state.log %}
+    <div id="hazardLog">{{ load_state.log | join('\n') }}</div>
+    {% else %}
+    <div id="hazardLog"></div>
+    {% endif %}
+
+    {% if event_count == 0 %}
+    <div class="alert alert-info mt-2 mb-0" style="font-size:0.85rem;">
+      No historical data loaded yet. Click <strong>Load GDACS History</strong> to fetch 5 years of Africa disaster records.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Hazard table ── -->
+  {% if profiles %}
+  {% set max_sev = profiles[0].severity_index %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between"
+         style="background:#fff; border-bottom:2px solid var(--ifrc-red);">
+      <strong>Country Hazard Profiles</strong>
+      <span class="text-muted" style="font-size:0.8rem;">
+        Sorted by severity index (red events × 3 + orange × 2 + green × 1)
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 hazard-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Country</th>
+            <th>Region</th>
+            <th>Tier</th>
+            <th>Severity Index</th>
+            <th>Total Events</th>
+            <th>Events / Yr</th>
+            <th>Dominant Type</th>
+            <th>Peak Month</th>
+            <th>Type Breakdown</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in profiles %}
+          {% set tier = 'low' %}
+          {% if p.severity_index >= 25 %}{% set tier = 'critical' %}
+          {% elif p.severity_index >= 12 %}{% set tier = 'high' %}
+          {% elif p.severity_index >= 5 %}{% set tier = 'medium' %}
+          {% endif %}
+          {% set bar_pct = ((p.severity_index / max_sev) * 100) | int if max_sev > 0 else 0 %}
+          {% set bar_color = '#C8102E' if tier == 'critical' else ('#e67e22' if tier == 'high' else ('#f1c40f' if tier == 'medium' else '#27ae60')) %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td>
+              <strong>{{ p.country }}</strong>
+              {% if p.iso3 %}<span class="text-muted ms-1" style="font-size:0.75rem;">({{ p.iso3 }})</span>{% endif %}
+            </td>
+            <td><span class="text-muted">{{ p.region or '—' }}</span></td>
+            <td>
+              <span class="tier-badge tier-{{ tier }}">{{ tier }}</span>
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span style="font-weight:600; min-width:2.5rem;">{{ p.severity_index }}</span>
+                <div class="sev-bar-wrap">
+                  <div class="sev-bar">
+                    <div class="sev-bar-fill"
+                         style="width:{{ bar_pct }}%; background:{{ bar_color }};"></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ p.total_events }}</td>
+            <td>{{ p.events_per_year }}</td>
+            <td>
+              {% if p.dominant_type %}
+              <span class="type-pill {{ p.dominant_type }}">{{ p.dominant_type }}</span>
+              <span class="ms-1 text-muted" style="font-size:0.8rem;">{{ p.dominant_label }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ p.peak_month or '—' }}</td>
+            <td>
+              {% for code, cnt in p.by_type.items() | sort(attribute='1', reverse=True) %}
+              <span class="type-pill {{ code }}" title="{{ cnt }} event(s)">{{ code }} {{ cnt }}</span>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Legend ── -->
+  <div class="mt-3 d-flex gap-3 flex-wrap" style="font-size:0.8rem; color:#666;">
+    <strong>Event types:</strong>
+    <span><span class="type-pill EQ">EQ</span> Earthquake</span>
+    <span><span class="type-pill FL">FL</span> Flood</span>
+    <span><span class="type-pill TC">TC</span> Cyclone</span>
+    <span><span class="type-pill DR">DR</span> Drought</span>
+    <span><span class="type-pill WF">WF</span> Wildfire</span>
+    <span><span class="type-pill VO">VO</span> Volcano</span>
+    &nbsp;|&nbsp;
+    <strong>Severity tier:</strong>
+    <span class="tier-badge tier-critical">Critical</span> ≥ 25 &nbsp;
+    <span class="tier-badge tier-high">High</span> ≥ 12 &nbsp;
+    <span class="tier-badge tier-medium">Medium</span> ≥ 5 &nbsp;
+    <span class="tier-badge tier-low">Low</span> &lt; 5
+  </div>
+
+  {% else %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body empty-state">
+      <div class="icon">🗺️</div>
+      <p class="mb-1"><strong>No hazard profiles yet</strong></p>
+      <p class="text-muted">Load GDACS historical data above to generate country risk profiles.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="mt-4 pb-4 text-muted" style="font-size:0.78rem;">
+    Source: GDACS REST API — <a href="https://www.gdacs.org" target="_blank">gdacs.org</a> &nbsp;·&nbsp;
+    Data covers alert levels: red (major), orange (moderate), green (minor) &nbsp;·&nbsp;
+    Severity index = Σ(red×3 + orange×2 + green×1) over 5 years
+  </div>
+</div><!-- /container -->
+
+<script>
+  function triggerLoad() {
+    document.getElementById('loadBtn').disabled = true;
+    document.getElementById('loadBtn').innerHTML =
+      '<span class="spinner-border spinner-border-sm me-1"></span>Loading…';
+    document.getElementById('hazardStatusBadge').textContent = 'RUNNING';
+    document.getElementById('hazardStatusBadge').className = 'badge bg-warning text-dark';
+
+    fetch('/gdacs-history', {method: 'POST'})
+      .then(r => r.json())
+      .then(d => {
+        if (d.status === 'already_running') {
+          alert('A load is already in progress. Please wait.');
+          return;
+        }
+        pollStatus();
+      })
+      .catch(e => {
+        alert('Failed to start load: ' + e);
+        document.getElementById('loadBtn').disabled = false;
+        document.getElementById('loadBtn').innerHTML = '⬇ Load GDACS History';
+      });
+  }
+
+  function pollStatus() {
+    fetch('/gdacs-history/status')
+      .then(r => r.json())
+      .then(d => {
+        const badge = document.getElementById('hazardStatusBadge');
+        if (d.status === 'running') {
+          setTimeout(pollStatus, 3000);
+        } else {
+          badge.textContent = d.status.toUpperCase();
+          badge.className = 'badge ' + (d.status === 'done' ? 'bg-success' : 'bg-danger');
+          // Show log
+          if (d.log && d.log.length) {
+            const logEl = document.getElementById('hazardLog');
+            logEl.textContent = d.log.join('\n');
+            logEl.style.display = 'block';
+          }
+          // Reload after 1.5s so table updates
+          setTimeout(() => location.reload(), 1500);
+        }
+      });
+  }
+
+  function toggleLog() {
+    const el = document.getElementById('hazardLog');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // Auto-poll if currently running
+  {% if load_state.status == 'running' %}
+  setTimeout(pollStatus, 3000);
+  {% endif %}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
