@@ -145,7 +145,24 @@ CREATE TABLE IF NOT EXISTS gdacs_events (
     to_date     TEXT,
     lat         REAL,
     lon         REAL,
+    glide       TEXT,
+    event_url   TEXT,
     created_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ifrc_go_events (
+    id            TEXT PRIMARY KEY,   -- "event_{go_id}"
+    go_id         INTEGER,
+    name          TEXT,
+    glide         TEXT,
+    disaster_type TEXT,
+    iso3          TEXT,
+    country       TEXT,
+    start_date    TEXT,
+    num_affected  INTEGER,
+    appeal_type   TEXT,               -- "DREF", "EA", "EAP", or ""
+    go_url        TEXT,
+    created_at    TEXT
 );
 """
 
@@ -159,9 +176,16 @@ def _conn() -> sqlite3.Connection:
 def init_db():
     with _conn() as conn:
         conn.executescript(_SCHEMA)
-        existing = {row[1] for row in conn.execute("PRAGMA table_info(stock_positions)")}
-        if "region" not in existing:
+        # stock_positions: add region column if missing
+        sp_cols = {row[1] for row in conn.execute("PRAGMA table_info(stock_positions)")}
+        if "region" not in sp_cols:
             conn.execute("ALTER TABLE stock_positions ADD COLUMN region TEXT")
+        # gdacs_events: add glide + event_url columns if missing (added in v2)
+        ge_cols = {row[1] for row in conn.execute("PRAGMA table_info(gdacs_events)")}
+        if "glide" not in ge_cols:
+            conn.execute("ALTER TABLE gdacs_events ADD COLUMN glide TEXT")
+        if "event_url" not in ge_cols:
+            conn.execute("ALTER TABLE gdacs_events ADD COLUMN event_url TEXT")
 
 
 def upsert_signal(signal: Signal):
@@ -548,7 +572,8 @@ def upsert_gdacs_event(event: dict):
         conn.execute(
             """INSERT OR REPLACE INTO gdacs_events VALUES
                (:id,:event_type,:event_name,:country,:iso3,:region,
-                :alert_level,:alert_score,:from_date,:to_date,:lat,:lon,:created_at)""",
+                :alert_level,:alert_score,:from_date,:to_date,:lat,:lon,
+                :glide,:event_url,:created_at)""",
             {
                 "id":          event.get("id", ""),
                 "event_type":  event.get("event_type", ""),
@@ -562,6 +587,8 @@ def upsert_gdacs_event(event: dict):
                 "to_date":     event.get("to_date", ""),
                 "lat":         event.get("lat"),
                 "lon":         event.get("lon"),
+                "glide":       event.get("glide", ""),
+                "event_url":   event.get("event_url", ""),
                 "created_at":  datetime.utcnow().isoformat(),
             },
         )
@@ -586,3 +613,71 @@ def get_gdacs_event_count() -> int:
     """Return the total number of stored GDACS events."""
     with _conn() as conn:
         return conn.execute("SELECT COUNT(*) FROM gdacs_events").fetchone()[0]
+
+
+# ── IFRC GO baseline events ──────────────────────────────────────────────────
+
+def upsert_ifrc_go_event(event: dict):
+    """Insert or replace an IFRC GO emergency event record."""
+    with _conn() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO ifrc_go_events VALUES
+               (:id,:go_id,:name,:glide,:disaster_type,:iso3,:country,
+                :start_date,:num_affected,:appeal_type,:go_url,:created_at)""",
+            {
+                "id":           event.get("id", ""),
+                "go_id":        event.get("go_id"),
+                "name":         event.get("name", ""),
+                "glide":        event.get("glide", ""),
+                "disaster_type": event.get("disaster_type", ""),
+                "iso3":         event.get("iso3", ""),
+                "country":      event.get("country", ""),
+                "start_date":   event.get("start_date", ""),
+                "num_affected": event.get("num_affected"),
+                "appeal_type":  event.get("appeal_type", ""),
+                "go_url":       event.get("go_url", ""),
+                "created_at":   datetime.utcnow().isoformat(),
+            },
+        )
+
+
+def get_ifrc_go_events(iso3: str = None) -> list[dict]:
+    """Return stored IFRC GO events, optionally filtered by ISO3 country code."""
+    with _conn() as conn:
+        if iso3:
+            rows = conn.execute(
+                "SELECT * FROM ifrc_go_events WHERE iso3=? ORDER BY start_date DESC",
+                (iso3,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM ifrc_go_events ORDER BY start_date DESC"
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_ifrc_go_event_count() -> int:
+    """Return the total number of stored IFRC GO events."""
+    with _conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM ifrc_go_events").fetchone()[0]
+
+
+def get_glide_links() -> dict:
+    """Return IFRC GO events indexed by iso3 and by GLIDE number.
+
+    Returns:
+        {
+            "by_iso3":  {iso3: [event_dicts]},
+            "by_glide": {glide: event_dict},  # only non-empty GLIDE values
+        }
+    """
+    from collections import defaultdict
+    events = get_ifrc_go_events()
+    by_iso3: dict  = defaultdict(list)
+    by_glide: dict = {}
+    for ev in events:
+        if ev.get("iso3"):
+            by_iso3[ev["iso3"]].append(ev)
+        if ev.get("glide"):
+            by_glide[ev["glide"]] = ev      # one GLIDE → one canonical operation
+    return {"by_iso3": dict(by_iso3), "by_glide": by_glide}

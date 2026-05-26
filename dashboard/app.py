@@ -17,7 +17,8 @@ from store.db import (store_whatsapp_message, upsert_logistics_request,
                       update_proposal_status, update_request_status, bulk_update_request_status,
                       upsert_stock_position, get_stock_positions, delete_stock_position,
                       upsert_allocation_run, get_allocation_runs, get_latest_allocation_run,
-                      get_gdacs_events, get_gdacs_event_count)
+                      get_gdacs_events, get_gdacs_event_count,
+                      get_ifrc_go_event_count, get_glide_links)
 from models import LogisticsRequest, StockPosition, AllocationRun
 from utils.regions import classify
 
@@ -723,37 +724,40 @@ def ratify_allocation():
     return redirect("/allocation")
 
 
-# ── Hazard baseline (GDACS historical) ─────────────────────────────────────
+# ── Hazard baseline (GDACS historical + IFRC GO linkage) ────────────────────
 
-_hazard_state = {"status": "idle", "log": []}
-_hazard_lock  = threading.Lock()
+_hazard_state  = {"status": "idle", "log": []}
+_hazard_lock   = threading.Lock()
+_go_base_state = {"status": "idle", "log": []}
+_go_base_lock  = threading.Lock()
 
 
-def _run_gdacs_history_background():
-    with _hazard_lock:
-        _hazard_state.update({"status": "running", "log": []})
+def _run_background_cmd(cmd_args: list, timeout: int, state: dict, lock: threading.Lock):
+    """Generic background subprocess runner shared by both baseline tasks."""
+    with lock:
+        state.update({"status": "running", "log": []})
     lines = []
     try:
         proc = subprocess.Popen(
-            [sys.executable, "main.py", "gdacs-history"],
+            [sys.executable, "main.py"] + cmd_args,
             cwd=_ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
         try:
-            stdout, _ = proc.communicate(timeout=300)
+            stdout, _ = proc.communicate(timeout=timeout)
             lines = [l.rstrip() for l in stdout.splitlines()]
             status = "done" if proc.returncode == 0 else "error"
         except subprocess.TimeoutExpired:
             proc.kill()
             stdout, _ = proc.communicate()
             lines = [l.rstrip() for l in stdout.splitlines()]
-            lines.append("[timeout] GDACS history load killed after 300s")
+            lines.append(f"[timeout] Killed after {timeout}s")
             status = "error"
     except Exception as e:
         lines.append(f"ERROR: {e}")
         status = "error"
-    with _hazard_lock:
-        _hazard_state["status"] = status
-        _hazard_state["log"]    = lines[-60:]
+    with lock:
+        state["status"] = status
+        state["log"]    = lines[-60:]
 
 
 @app.route("/gdacs-history", methods=["POST"])
@@ -761,7 +765,11 @@ def trigger_gdacs_history():
     with _hazard_lock:
         if _hazard_state["status"] == "running":
             return jsonify({"status": "already_running"}), 409
-    threading.Thread(target=_run_gdacs_history_background, daemon=True).start()
+    threading.Thread(
+        target=_run_background_cmd,
+        args=(["gdacs-history"], 300, _hazard_state, _hazard_lock),
+        daemon=True,
+    ).start()
     return jsonify({"status": "started"}), 202
 
 
@@ -771,19 +779,67 @@ def gdacs_history_status():
         return jsonify(_hazard_state.copy())
 
 
+@app.route("/ifrc-go-baseline", methods=["POST"])
+def trigger_go_baseline():
+    with _go_base_lock:
+        if _go_base_state["status"] == "running":
+            return jsonify({"status": "already_running"}), 409
+    threading.Thread(
+        target=_run_background_cmd,
+        args=(["ifrc-go-baseline"], 180, _go_base_state, _go_base_lock),
+        daemon=True,
+    ).start()
+    return jsonify({"status": "started"}), 202
+
+
+@app.route("/ifrc-go-baseline/status")
+def go_baseline_status():
+    with _go_base_lock:
+        return jsonify(_go_base_state.copy())
+
+
 @app.route("/hazard")
 def hazard():
     from risk.baseline import compute_hazard_profiles
     events       = get_gdacs_events()
     event_count  = get_gdacs_event_count()
+    go_count     = get_ifrc_go_event_count()
     profiles     = compute_hazard_profiles(events, years_back=5)
+    links        = get_glide_links()   # {"by_iso3": {...}, "by_glide": {...}}
+
+    # Annotate each profile with IFRC GO linkage stats
+    for p in profiles:
+        iso3 = p.get("iso3", "")
+        go_ops = links["by_iso3"].get(iso3, [])
+        p["go_op_count"]  = len(go_ops)
+        p["go_ops"]       = go_ops[:5]   # top 5 for tooltip / inline display
+
+        # GLIDE-matched count (more precise than iso3-only)
+        glide_matches = 0
+        for ev in events:
+            if ev.get("iso3") == iso3 and ev.get("glide") and ev["glide"] in links["by_glide"]:
+                glide_matches += 1
+        p["glide_match_count"] = glide_matches
+
+    # Gap analysis: countries with red GDACS events but zero IFRC GO operations
+    gaps = [
+        p for p in profiles
+        if p["by_alert"].get("red", 0) > 0 and p["go_op_count"] == 0
+    ]
+
     with _hazard_lock:
         load_state = _hazard_state.copy()
+    with _go_base_lock:
+        go_state = _go_base_state.copy()
+
     return render_template(
         "hazard.html",
         profiles=profiles,
         event_count=event_count,
+        go_count=go_count,
         load_state=load_state,
+        go_state=go_state,
+        gaps=gaps,
     )
 
 

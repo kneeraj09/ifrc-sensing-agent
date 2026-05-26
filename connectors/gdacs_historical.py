@@ -74,6 +74,8 @@ def _fetch_year(year: int, target_regions: list[str]) -> list[dict]:
             "to_date":     (props.get("todate")   or "")[:10],
             "lat":         coords[1] if len(coords) > 1 else None,
             "lon":         coords[0] if len(coords) > 0 else None,
+            "glide":       (props.get("glide") or "").strip(),
+            "event_url":   (props.get("url") or "").strip(),
         })
     return events
 

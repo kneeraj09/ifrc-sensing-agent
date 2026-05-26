@@ -39,6 +39,17 @@ def _primary_country(item: dict) -> str:
     return ""
 
 
+def _primary_iso3(item: dict) -> str:
+    """Extract the primary ISO3 country code from an event or field-report item."""
+    for key in ("countries_details", "countries"):
+        countries = item.get(key) or []
+        if countries and isinstance(countries, list):
+            c = countries[0]
+            if isinstance(c, dict):
+                return c.get("iso3", "") or c.get("iso", "")
+    return ""
+
+
 def _fetch(endpoint: str, params: dict) -> list[dict]:
     try:
         resp = requests.get(
@@ -150,6 +161,80 @@ def _fetch_field_reports(limit: int, days_back: int) -> list[dict]:
         })
     print(f"[ifrc_go]  /field-report: {len(articles)} item(s)")
     return articles
+
+
+# ── Baseline fetch (multi-year, for GLIDE linkage) ───────────────────────────
+
+# IFRC GO appeal type codes
+_APPEAL_TYPE = {1: "DREF", 2: "EA", 3: "EAP"}
+
+
+def fetch_events_baseline(years_back: int = 2, page_size: int = 100) -> list[dict]:
+    """Fetch IFRC GO emergency events for the baseline cross-reference.
+
+    Fetches multiple pages going back ``years_back`` calendar years and extracts
+    the GLIDE number, disaster type, country, and appeal type so records can be
+    linked against GDACS historical events.
+
+    Returns:
+        List of dicts with keys: id, go_id, name, glide, disaster_type,
+        iso3, country, start_date, num_affected, appeal_type, go_url.
+    """
+    since = (datetime.now(timezone.utc) - timedelta(days=years_back * 365)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    all_items: list[dict] = []
+    offset = 0
+    while True:
+        items = _fetch("event", {
+            "limit":                    page_size,
+            "offset":                   offset,
+            "ordering":                 "-disaster_start_date",
+            "disaster_start_date__gte": since,
+            "format":                   "json",
+        })
+        if not items:
+            break
+        all_items.extend(items)
+        if len(items) < page_size:
+            break
+        offset += page_size
+        if offset >= 2000:          # safety cap — ~20 pages
+            break
+
+    events = []
+    for item in all_items:
+        dtype    = item.get("dtype") or {}
+        dtype_nm = dtype.get("name", "") if isinstance(dtype, dict) else ""
+        country  = _primary_country(item)
+        iso3     = _primary_iso3(item)
+        glide    = (item.get("glide") or "").strip()
+
+        # Pick the highest-priority appeal type (EA > EAP > DREF)
+        appeal_type = ""
+        for appeal in (item.get("appeals") or []):
+            if isinstance(appeal, dict):
+                code = _APPEAL_TYPE.get(appeal.get("atype"), "")
+                if code == "EA":
+                    appeal_type = "EA"
+                    break
+                if code in ("EAP", "DREF") and not appeal_type:
+                    appeal_type = code
+
+        events.append({
+            "id":           f"event_{item['id']}",
+            "go_id":        item.get("id"),
+            "name":         (item.get("name") or "").strip(),
+            "glide":        glide,
+            "disaster_type": dtype_nm,
+            "iso3":         iso3,
+            "country":      country,
+            "start_date":   (item.get("disaster_start_date") or "")[:10],
+            "num_affected": item.get("num_affected"),
+            "appeal_type":  appeal_type,
+            "go_url":       f"https://go.ifrc.org/emergencies/{item['id']}",
+        })
+
+    print(f"[ifrc_go]  baseline: {len(events)} emergency event(s) ({years_back}yr lookback)")
+    return events
 
 
 # ── Public entry point ────────────────────────────────────────────────────────

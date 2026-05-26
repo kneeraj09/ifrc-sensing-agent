@@ -17,7 +17,8 @@ from store.db import (init_db, upsert_signal, upsert_belief_state, get_recent_si
                       upsert_proposal, clear_demand_clusters, demand_source_already_processed,
                       mark_demand_source_processed, get_unprocessed_demand_messages,
                       mark_whatsapp_processed, bulk_update_request_status,
-                      upsert_gdacs_event, get_gdacs_event_count)
+                      upsert_gdacs_event, get_gdacs_event_count,
+                      upsert_ifrc_go_event, get_ifrc_go_event_count)
 from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp, ifrc_go
 from connectors.gdacs_historical import fetch_historical
 from extraction.agent import extract_signals
@@ -145,6 +146,19 @@ def cmd_demand_run():
     cmd_demand_cluster()
 
 
+def cmd_ifrc_go_baseline(years_back: int = 2) -> list:
+    """Fetch IFRC GO emergency events and upsert into the ifrc_go_events table."""
+    print(f"[ifrc-go-baseline] Fetching {years_back} year(s) of IFRC GO emergency events...")
+    events = ifrc_go.fetch_events_baseline(years_back=years_back)
+    for ev in events:
+        upsert_ifrc_go_event(ev)
+    total = get_ifrc_go_event_count()
+    go_linked = sum(1 for ev in events if ev.get("glide"))
+    print(f"[ifrc-go-baseline] Done. {len(events)} event(s) upserted, "
+          f"{go_linked} with GLIDE number. Total in DB: {total}")
+    return events
+
+
 def cmd_gdacs_history(years_back: int = 5, regions: list[str] = None) -> list:
     """Fetch multi-year GDACS events and upsert into the gdacs_events table."""
     if regions is None:
@@ -190,6 +204,11 @@ def main():
                         metavar="REGION",
                         help="Regions to fetch (default: Africa)")
 
+    p_go = sub.add_parser("ifrc-go-baseline",
+                          help="Load IFRC GO emergency events for GLIDE cross-reference")
+    p_go.add_argument("--years-back", type=int, default=2,
+                      help="Number of past years to fetch (default: 2)")
+
     args = parser.parse_args()
     init_db()
 
@@ -211,6 +230,8 @@ def main():
         cmd_demand_run()
     elif args.command == "gdacs-history":
         cmd_gdacs_history(years_back=args.years_back, regions=args.regions)
+    elif args.command == "ifrc-go-baseline":
+        cmd_ifrc_go_baseline(years_back=args.years_back)
 
 
 if __name__ == "__main__":
