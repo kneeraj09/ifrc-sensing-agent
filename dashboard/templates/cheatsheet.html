@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Humanitarian Sensing Agent — Field Reference</title>
+  <title>Humanitarian Sensing Agent — Field Guide</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --navy: #1a2744; --red: #c8102e; --lgray: #f4f4f4; --mgray: #dddddd;
-      --white: #ffffff; --text: #333333; --subtext: #555555;
+      --white: #ffffff; --text: #333333; --subtext: #555555; --green: #1a6b3c;
     }
     body { font-family: 'Inter', sans-serif; background: var(--lgray); color: var(--text); font-size: 13px; line-height: 1.6; }
 
@@ -28,6 +28,7 @@
     /* ── Section header ── */
     .sec-header { background: var(--red); color: var(--white); font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; padding: 6px 12px; border-radius: 3px; margin: 20px 0 10px; }
     .col > .sec-header:first-child { margin-top: 0; }
+    .sec-header.navy { background: var(--navy); }
 
     /* ── Tables ── */
     .cs-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
@@ -52,8 +53,9 @@
 
     /* ── Body text ── */
     .body-text { font-size: 12px; line-height: 1.65; color: var(--subtext); margin-bottom: 10px; }
-    .body-text.bold { font-weight: 600; color: var(--text); }
-    .body-text.navy { color: var(--navy); font-weight: 600; }
+    .body-text.bold  { font-weight: 600; color: var(--text); }
+    .body-text.navy  { color: var(--navy); font-weight: 600; }
+    .body-text.green { color: var(--green); font-weight: 600; }
 
     /* ── Demand legend ── */
     .percentile-row { display: flex; gap: 24px; margin: 8px 0 14px; font-size: 12px; }
@@ -70,8 +72,19 @@
     .sw-low      { background: #1a6b3c; }
     .sw-unknown  { background: #adb5bd; }
 
+    /* ── Severity tier swatches ── */
+    .tier-swatch { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-right: 4px; }
+    .tier-critical { background: #C8102E; color: #fff; }
+    .tier-high     { background: #e67e22; color: #fff; }
+    .tier-medium   { background: #f1c40f; color: #1A2744; }
+    .tier-low      { background: #27ae60; color: #fff; }
+
+    /* ── GLIDE callout ── */
+    .glide-callout { background: #e8f5e9; border-left: 3px solid var(--green); padding: 10px 14px; border-radius: 3px; font-size: 12px; margin-bottom: 10px; }
+    .glide-callout strong { color: var(--green); }
+
     /* ── Footer ── */
-    .doc-footer { background: var(--navy); color: rgba(255,255,255,.5); font-size: 11px; text-align: center; padding: 12px 24px; margin-top: 40px; border-top: 3px solid var(--red); }
+    .doc-footer { background: var(--navy); color: rgba(255,255,255,.5); font-size: 11px; text-align: center; padding: 14px 24px; margin-top: 40px; border-top: 3px solid var(--red); line-height: 2; }
     .doc-footer code { background: rgba(255,255,255,.1); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
 
     /* ── Back link ── */
@@ -79,10 +92,11 @@
     .back-link { font-size: 12px; color: var(--navy); text-decoration: none; font-weight: 500; }
     .back-link:hover { color: var(--red); }
 
-    /* ── Agent section divider ── */
+    /* ── Agent / module section divider ── */
     .agent-divider { max-width: 1100px; margin: 36px auto 0; padding: 0 24px; }
     .agent-divider-bar { background: var(--navy); color: var(--white); padding: 10px 18px; border-left: 5px solid var(--red); border-radius: 3px; display: flex; align-items: baseline; gap: 14px; }
-    .agent-divider-bar .agent-num { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; opacity: .6; }
+    .agent-divider-bar.green { border-left-color: var(--green); }
+    .agent-divider-bar .agent-num  { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; opacity: .6; }
     .agent-divider-bar .agent-name { font-size: 15px; font-weight: 700; }
     .agent-divider-bar .agent-desc { font-size: 12px; font-weight: 300; opacity: .65; font-style: italic; }
 
@@ -90,9 +104,12 @@
     .scenario-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; margin: 8px 0 14px; }
     .scenario-card { background: var(--white); border: 1px solid var(--mgray); border-radius: 4px; padding: 8px 10px; font-size: 11px; }
     .scenario-card .sc-name { font-weight: 700; color: var(--navy); font-size: 12px; margin-bottom: 2px; }
-    .scenario-card .sc-cr { color: var(--red); font-weight: 600; font-size: 11px; }
+    .scenario-card .sc-cr   { color: var(--red); font-weight: 600; font-size: 11px; }
     .scenario-card .sc-desc { color: var(--subtext); margin-top: 3px; line-height: 1.45; }
     @media (max-width: 720px) { .scenario-grid { grid-template-columns: 1fr 1fr; } }
+
+    /* ── Region badges ── */
+    .region-badge { display: inline-block; background: #e8ecf5; color: var(--navy); border-radius: 9px; padding: 1px 7px; font-size: 10px; font-weight: 600; margin: 1px; }
   </style>
 </head>
 <body>
@@ -100,30 +117,30 @@
 <div class="doc-header">
   <div>
     <div><span class="cross">+</span><span class="header-title">Humanitarian Sensing Agent</span></div>
-    <div class="header-sub" style="padding-left:38px">Field Reference — How signals become decisions</div>
+    <div class="header-sub" style="padding-left:38px">Field Guide — How signals become decisions</div>
   </div>
   <div class="header-right">
-    IFRC / Sensing Agent v1.0<br>
+    IFRC / Sensing Agent v1.1<br>
     <a href="/" style="color:rgba(255,255,255,.5);font-size:11px;text-decoration:none">← Back to dashboard</a>
   </div>
 </div>
 
-<div class="back-bar">
-</div>
+<div class="back-bar"></div>
 
+<!-- ════════════════ AGENT 1 ════════════════ -->
 <div class="page">
   <div class="columns">
 
     <!-- ════════════════ LEFT COLUMN ════════════════ -->
     <div class="col">
 
-      <div class="sec-header">Data Sources</div>
+      <div class="sec-header">Data Sources — Real-Time Signal Layer</div>
       <table class="cs-table">
         <thead><tr><th>Source</th><th>What it captures</th><th>Wt.</th></tr></thead>
         <tbody>
           <tr><td><strong>IFRC GO</strong></td><td>IFRC's own operational platform — emergency events &amp; NS field reports (7-day window)</td><td class="wt">0.95</td></tr>
           <tr><td>ReliefWeb</td><td>Humanitarian situation reports</td><td class="wt">0.90</td></tr>
-          <tr><td>GDACS</td><td>Disaster alerts: quakes, floods, cyclones, drought</td><td class="wt">0.90</td></tr>
+          <tr><td>GDACS</td><td>Live disaster alerts: earthquakes, floods, cyclones, drought, wildfire, volcano</td><td class="wt">0.90</td></tr>
           <tr><td>FEWS NET</td><td>Food security early warning, IPC phases</td><td class="wt">0.88</td></tr>
           <tr><td>HDX</td><td>UN Flash Appeals, humanitarian needs overviews</td><td class="wt">0.85</td></tr>
           <tr><td>ACLED</td><td>Conflict events, security incidents, fatalities</td><td class="wt">0.85</td></tr>
@@ -251,6 +268,119 @@
   </div>
 </div>
 
+<!-- ════════════════ HAZARD BASELINE ════════════════ -->
+<div class="agent-divider">
+  <div class="agent-divider-bar green">
+    <span class="agent-num">Baseline Layer</span>
+    <span class="agent-name">Hazard Baseline — Historical Risk &amp; Response</span>
+    <span class="agent-desc">5-year GDACS disaster archive linked to IFRC GO operations via GLIDE numbers</span>
+  </div>
+</div>
+
+<div class="page" style="padding-top:20px">
+  <div class="columns">
+
+    <!-- LEFT: loading & profiles -->
+    <div class="col">
+
+      <div class="sec-header">What the Hazard Baseline Is</div>
+      <p class="body-text">The Hazard Baseline is a static analytical layer — separate from the real-time signal pipeline — that provides historical context for each country. It answers: <em>"How often does this country get hit, by what type of disaster, and did IFRC respond?"</em></p>
+      <p class="body-text">It combines two data sets:</p>
+      <ul class="bullets">
+        <li><strong>GDACS historical</strong> — 5 years of earthquake, flood, cyclone, drought, wildfire, and volcano events via the GDACS REST API, filtered to IFRC priority regions</li>
+        <li><strong>IFRC GO operations</strong> — 2 years of emergency events and appeals from the IFRC GO platform, cross-referenced via GLIDE numbers</li>
+      </ul>
+
+      <div class="sec-header">How to Build the Baseline (Two Steps)</div>
+      <ol class="steps">
+        <li data-n="1">Go to the <strong>Hazard Baseline</strong> dashboard (<a href="/hazard">/hazard</a>)</li>
+        <li data-n="2">Click <strong>⬇ Load GDACS History</strong> — fetches 5 years of Africa disaster events (~30s). Progress shows in the log panel below the button</li>
+        <li data-n="3">Once done, click <strong>🔗 Link IFRC GO</strong> — fetches 2 years of IFRC GO emergency operations and matches them to GDACS events (~20s)</li>
+        <li data-n="4">Page reloads automatically — the country table populates with severity profiles and IFRC GO response coverage</li>
+        <li data-n="5">Run again periodically (monthly recommended) to capture new events</li>
+      </ol>
+
+      <div class="sec-header">GDACS Event Types</div>
+      <table class="cs-table">
+        <thead><tr><th>Code</th><th>Disaster type</th><th>Alert colours</th></tr></thead>
+        <tbody>
+          <tr><td><strong>EQ</strong></td><td>Earthquake</td><td>Red / Orange / Green by magnitude + exposure</td></tr>
+          <tr><td><strong>FL</strong></td><td>Flood</td><td>Red / Orange / Green by affected population</td></tr>
+          <tr><td><strong>TC</strong></td><td>Tropical Cyclone</td><td>Red / Orange / Green by wind speed + track</td></tr>
+          <tr><td><strong>DR</strong></td><td>Drought</td><td>Red / Orange / Green by severity index</td></tr>
+          <tr><td><strong>WF</strong></td><td>Wildfire</td><td>Red / Orange / Green by area burned</td></tr>
+          <tr><td><strong>VO</strong></td><td>Volcano</td><td>Red / Orange / Green by eruption level</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Hazard Baseline CLI</div>
+      <table class="cs-table">
+        <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>python main.py gdacs-history</code></td><td>Load 5 years of GDACS events for Africa into the DB</td></tr>
+          <tr><td><code>python main.py gdacs-history --years-back 10</code></td><td>Load 10 years (e.g. for initial setup)</td></tr>
+          <tr><td><code>python main.py gdacs-history --regions Africa Asia</code></td><td>Include multiple regions</td></tr>
+          <tr><td><code>python main.py ifrc-go-baseline</code></td><td>Fetch 2 years of IFRC GO events and compute GLIDE links</td></tr>
+          <tr><td><code>python main.py ifrc-go-baseline --years-back 3</code></td><td>Extend the GO lookback window</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+
+    <!-- RIGHT: interpreting profiles & gap analysis -->
+    <div class="col">
+
+      <div class="sec-header">GLIDE Number — The Linking Key</div>
+      <div class="glide-callout">
+        <strong>GLIDE</strong> (Global IDEntifier) is a shared disaster reference code adopted across humanitarian systems. When a cyclone hits Mozambique, GDACS, IFRC GO, UN OCHA, and national civil protection all reference the same GLIDE: e.g. <code>TC-2023-000056-MOZ</code>. This is the primary key that links GDACS historical events to IFRC GO operations.
+      </div>
+      <ul class="bullets">
+        <li>GLIDE coverage is highest for large-scale operations (Emergency Appeals, DREF activations)</li>
+        <li>Smaller events may lack a GLIDE on one side — the system falls back to iso3 country matching</li>
+        <li>The <span style="background:#e8f5e9;color:#1e8449;border-radius:3px;padding:1px 5px;font-size:11px;font-family:monospace;">N GLIDE</span> tag in the hazard table shows exact event-level matches (not just country)</li>
+      </ul>
+
+      <div class="sec-header">How to Interpret the Hazard Profiles</div>
+      <table class="cs-table">
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Severity Index</strong></td><td>Sum of red×3 + orange×2 + green×1 over 5 years. Reflects cumulative disaster exposure, not a single event.</td></tr>
+          <tr><td><strong>Tier</strong></td><td>
+            <span class="tier-swatch tier-critical">Critical</span> ≥25 &nbsp;
+            <span class="tier-swatch tier-high">High</span> ≥12 &nbsp;
+            <span class="tier-swatch tier-medium">Medium</span> ≥5 &nbsp;
+            <span class="tier-swatch tier-low">Low</span> &lt;5
+          </td></tr>
+          <tr><td><strong>Events / Year</strong></td><td>Total events ÷ 5 — an annualised frequency for planning</td></tr>
+          <tr><td><strong>Dominant Type</strong></td><td>The hazard type with most events in the 5-year window</td></tr>
+          <tr><td><strong>Peak Month</strong></td><td>Month with the highest historical event frequency — useful for pre-positioning timing</td></tr>
+          <tr><td><strong>IFRC GO column</strong></td><td>Count of IFRC GO emergency operations for that country (2-year window). Green ✓ = response found; — = no match</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Gap Analysis</div>
+      <p class="body-text">The gap analysis table appears automatically below the country profiles whenever <strong>red-alert GDACS events exist for a country but no matching IFRC GO operation is found</strong>. This is a signal for potential under-response — not a definitive finding.</p>
+      <ul class="bullets">
+        <li>Gaps can be genuine (no IFRC response) or artefacts (GO operation exists but lacks GLIDE metadata)</li>
+        <li>The 2-year GO window vs 5-year GDACS window means older events will always show as gaps</li>
+        <li>Use the gap table as a <em>prompt for investigation</em>, not a conclusion</li>
+        <li>Cross-check against National Society reports and regional operation records before acting</li>
+      </ul>
+
+      <div class="sec-header">IFRC GO Appeal Types</div>
+      <table class="cs-table">
+        <thead><tr><th>Type</th><th>Meaning</th><th>Scale</th></tr></thead>
+        <tbody>
+          <tr><td><strong>EA</strong></td><td>Emergency Appeal</td><td>Large-scale, multi-month operation (>CHF 100k)</td></tr>
+          <tr><td><strong>DREF</strong></td><td>Disaster Response Emergency Fund</td><td>Rapid small-scale deployment (≤CHF 500k)</td></tr>
+          <tr><td><strong>EAP</strong></td><td>Emergency Appeal Plan</td><td>Pre-approved plan for recurring hazards</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════ AGENT 2 ════════════════ -->
 <div class="agent-divider">
   <div class="agent-divider-bar">
@@ -345,25 +475,45 @@
   <div class="agent-divider-bar">
     <span class="agent-num">Agent 3</span>
     <span class="agent-name">Allocation &amp; Ethical Tradeoff</span>
-    <span class="agent-desc">Newsvendor algorithm · 5 ethical scenarios · Human ratification</span>
+    <span class="agent-desc">Newsvendor algorithm · Regional stock pools · 5 ethical scenarios · Human ratification</span>
   </div>
 </div>
 
 <div class="page" style="padding-top:20px">
   <div class="columns">
 
-    <!-- LEFT: algorithm & scenarios -->
+    <!-- LEFT: algorithm, regional pools & scenarios -->
     <div class="col">
 
+      <div class="sec-header">Regional Stock Pools</div>
+      <p class="body-text bold">Stock is regionally segmented. Africa stock only allocates to Africa locations.</p>
+      <p class="body-text">When adding a stock position, assign it to a region. The newsvendor model runs independently per region, then results are merged. A location with no matching regional stock pool will not appear in the allocation output.</p>
+      <table class="cs-table">
+        <thead><tr><th>Region</th><th>How to assign</th></tr></thead>
+        <tbody>
+          <tr><td>
+            <span class="region-badge">Africa</span>
+            <span class="region-badge">Asia</span>
+            <span class="region-badge">Middle East</span><br>
+            <span class="region-badge">Latin America</span>
+            <span class="region-badge">Europe</span>
+            <span class="region-badge">North America</span><br>
+            <span class="region-badge">Oceania</span>
+            <span class="region-badge">Global</span>
+          </td><td>Select from the Region dropdown when entering a stock position. Use <em>Global</em> for unallocated reserve stock.</td></tr>
+        </tbody>
+      </table>
+      <p class="body-text" style="margin-top:6px">Region is auto-detected for belief states from the country name. Stock regions must be set manually by the coordinator.</p>
+
       <div class="sec-header">The Newsvendor Algorithm</div>
-      <p class="body-text">The agent uses a <strong>multi-location newsvendor model</strong> to compute how to allocate a fixed stock across multiple locations under demand uncertainty. It uses the P10/P50/P90 demand estimates from Agent 1 as inputs.</p>
+      <p class="body-text">The agent uses a <strong>multi-location newsvendor model</strong> to compute how to allocate a fixed regional stock across multiple locations under demand uncertainty. It uses the P10/P50/P90 demand estimates from Agent 1 as inputs.</p>
       <p class="body-text navy">Optimal quantity per location: Q* = μ + σ × Φ⁻¹(critical ratio)</p>
       <ul class="bullets">
         <li><strong>μ</strong> = P50 demand estimate (central case)</li>
         <li><strong>σ</strong> = demand spread, derived from P10–P90 range</li>
         <li><strong>Critical ratio</strong> = the ethical stance on risk — higher means fewer shortfalls</li>
         <li>An <strong>equity floor</strong> guarantees every location receives at least its P10 estimate</li>
-        <li>If total Q* exceeds available stock, residuals are scaled down proportionally after floors are paid</li>
+        <li>If total Q* exceeds regional stock, residuals are scaled down proportionally after floors are paid</li>
       </ul>
 
       <div class="sec-header">The 5 Ethical Scenarios</div>
@@ -415,13 +565,14 @@
 
       <div class="sec-header">Coordinator Workflow</div>
       <ol class="steps">
-        <li data-n="1">Go to the <strong>Allocation</strong> dashboard and enter available stock, commodity, and unit</li>
-        <li data-n="2">Click <strong>Run allocation</strong> — all 5 scenarios are computed simultaneously from Agent 1 belief states</li>
-        <li data-n="3">Compare the 5 scenario cards: equity score, average coverage, locations at risk</li>
-        <li data-n="4">Click a scenario card to select it — Claude generates a 3-paragraph decision brief</li>
-        <li data-n="5">Optionally enter <strong>manual overrides</strong> for specific locations (your field judgement takes precedence)</li>
-        <li data-n="6">Review the brief: Situation, Ethical Rationale, Residual Risk</li>
-        <li data-n="7"><strong>Ratify</strong> the decision with a brief justification — this locks the run and creates an audit record</li>
+        <li data-n="1">Go to the <strong>Allocation</strong> dashboard and add your stock position(s) — <strong>set the Region</strong> for each depot entry</li>
+        <li data-n="2">Enter the commodity and unit you want to allocate, then click <strong>Run allocation</strong></li>
+        <li data-n="3">The system groups stock and belief states by region and runs the newsvendor model independently per region</li>
+        <li data-n="4">All 5 scenarios are computed simultaneously — compare the scenario cards: equity score, average coverage, locations at risk</li>
+        <li data-n="5">Click a scenario card to select it — Claude generates a 3-paragraph decision brief</li>
+        <li data-n="6">Optionally enter <strong>manual overrides</strong> for specific locations (your field judgement takes precedence)</li>
+        <li data-n="7">Review the brief: Situation, Ethical Rationale, Residual Risk</li>
+        <li data-n="8"><strong>Ratify</strong> the decision with a brief justification — this locks the run and creates an audit record</li>
       </ol>
 
       <div class="sec-header">The Decision Brief</div>
@@ -447,6 +598,7 @@
       <div class="sec-header">Key Principles</div>
       <ul class="bullets">
         <li>The algorithm is a <em>decision support tool</em>, not a decision-maker — the coordinator always ratifies</li>
+        <li>Stock is regionally pooled — enter a Region for every depot to ensure correct scoping</li>
         <li>Allocation uses demand estimates from Agent 1 — run ingestion first for current data</li>
         <li>A ratified run is locked; a new run must be started to revise an allocation</li>
         <li>All runs are stored — the run history is accessible at the bottom of the Allocation dashboard</li>
@@ -458,11 +610,12 @@
 </div>
 
 <div class="doc-footer">
-  Agent 1 — Sensing: <code>python main.py run</code> &nbsp;|&nbsp;
-  Agent 2 — Demand: <code>python main.py demand-run</code> &nbsp;|&nbsp;
-  Agent 3 — Allocation: <a href="/allocation" style="color:rgba(255,255,255,.5)">Allocation dashboard</a> &nbsp;|&nbsp;
-  Signals window: 72 hours &nbsp;|&nbsp;
-  Briefing refresh: 30 min
+  <strong style="color:rgba(255,255,255,.7)">Sensing Agent CLI</strong><br>
+  Agent 1 (sensing): <code>python main.py run</code> &nbsp;|&nbsp;
+  Agent 2 (demand): <code>python main.py demand-run</code> &nbsp;|&nbsp;
+  Agent 3 (allocation): <a href="/allocation" style="color:rgba(255,255,255,.5)">Allocation dashboard</a><br>
+  Hazard baseline: <code>python main.py gdacs-history</code> then <code>python main.py ifrc-go-baseline</code> &nbsp;|&nbsp;
+  Signals window: 72h &nbsp;|&nbsp; Briefing refresh: 30 min
 </div>
 
 </body>
