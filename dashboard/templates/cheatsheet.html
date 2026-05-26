@@ -110,6 +110,26 @@
 
     /* ── Region badges ── */
     .region-badge { display: inline-block; background: #e8ecf5; color: var(--navy); border-radius: 9px; padding: 1px 7px; font-size: 10px; font-weight: 600; margin: 1px; }
+
+    /* ── Methodology section ── */
+    .method-section { max-width: 1100px; margin: 0 auto 8px; padding: 0 24px; }
+    .method-header { background: var(--navy); color: var(--white); padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; border-left: 5px solid var(--red); border-radius: 3px; margin-bottom: 16px; }
+    .pipeline { display: flex; align-items: stretch; gap: 0; margin-bottom: 20px; border: 1px solid var(--mgray); border-radius: 5px; overflow: hidden; }
+    .pipe-step { flex: 1; padding: 11px 12px; background: var(--white); border-right: 1px solid var(--mgray); text-align: center; position: relative; }
+    .pipe-step:last-child { border-right: none; }
+    .pipe-step.accent { background: #f0f3fa; }
+    .pipe-step.highlight { background: #fff5f0; }
+    .pipe-step.baseline-step { background: #f0faf4; }
+    .pipe-step .ps-num  { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--red); margin-bottom: 3px; }
+    .pipe-step .ps-name { font-size: 12px; font-weight: 700; color: var(--navy); }
+    .pipe-step .ps-sub  { font-size: 10px; color: var(--subtext); margin-top: 2px; line-height: 1.35; }
+    .pipe-arrow { display: flex; align-items: center; padding: 0 2px; color: var(--mgray); font-size: 16px; flex-shrink: 0; background: var(--white); }
+    .method-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    @media (max-width: 720px) { .method-columns { grid-template-columns: 1fr; } .pipeline { flex-direction: column; } }
+    .formula-box { background: #f0f3fa; border-left: 3px solid var(--navy); padding: 10px 14px; border-radius: 3px; font-size: 12px; margin: 8px 0 12px; }
+    .formula-box .formula { font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; color: var(--navy); }
+    .formula-box .formula-desc { color: var(--subtext); margin-top: 6px; line-height: 1.55; }
+    .limitation-box { background: #fffbf0; border-left: 3px solid #b8860b; padding: 10px 14px; border-radius: 3px; font-size: 12px; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -126,6 +146,154 @@
 </div>
 
 <div class="back-bar"></div>
+
+<!-- ════════════════ METHODOLOGY OVERVIEW ════════════════ -->
+<div class="method-section" style="margin-top:28px">
+  <div class="method-header">Overall Methodology — From Raw Data to Ratified Decision</div>
+
+  <!-- Pipeline flow -->
+  <div class="pipeline">
+    <div class="pipe-step accent">
+      <div class="ps-num">Inputs</div>
+      <div class="ps-name">10 Live Sources</div>
+      <div class="ps-sub">IFRC GO · GDACS · ReliefWeb · FEWS NET · HDX · ACLED · BBC · GDELT · Email · WhatsApp</div>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <div class="ps-num">Agent 1</div>
+      <div class="ps-name">Signal Extraction</div>
+      <div class="ps-sub">Claude LLM reads each item and extracts structured signals (location, commodity, urgency, confidence)</div>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <div class="ps-num">Agent 1</div>
+      <div class="ps-name">Belief States</div>
+      <div class="ps-sub">Signals aggregated into P10/P50/P90 demand estimates and risk levels per location × commodity</div>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step highlight">
+      <div class="ps-num">Agent 2</div>
+      <div class="ps-name">Demand Clustering</div>
+      <div class="ps-sub">Logistics requests consolidated by commodity + corridor into shipment proposals</div>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step highlight">
+      <div class="ps-num">Agent 3</div>
+      <div class="ps-name">Newsvendor Allocation</div>
+      <div class="ps-sub">Stock distributed across locations using 5 ethical scenario variants — per region</div>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step accent">
+      <div class="ps-num">Output</div>
+      <div class="ps-name">Ratified Decision</div>
+      <div class="ps-sub">Coordinator selects scenario, reviews SCQA brief, enters rationale — creates audit record</div>
+    </div>
+  </div>
+
+  <!-- Supporting baseline row -->
+  <div style="display:flex;align-items:center;gap:10px;margin:-8px 0 20px;font-size:11px;color:var(--subtext)">
+    <div style="flex:1;border-top:2px dashed #c5d0e0;"></div>
+    <div style="background:#f0faf4;border:1px solid #a8d5b5;border-radius:14px;padding:4px 14px;color:var(--green);font-weight:600;white-space:nowrap">
+      ↑ Supporting Layer — Historical Hazard Baseline: GDACS 5yr archive linked to IFRC GO operations via GLIDE numbers
+    </div>
+    <div style="flex:1;border-top:2px dashed #c5d0e0;"></div>
+  </div>
+
+  <!-- Two-column methodology detail -->
+  <div class="method-columns">
+
+    <!-- LEFT -->
+    <div>
+      <div class="sec-header">Signal Aggregation Methodology</div>
+      <p class="body-text">Each ingestion cycle fetches raw text from all configured sources and passes each item to Claude, which extracts one or more structured <strong>signals</strong>. A signal encodes five dimensions: <em>location, commodity, signal type, urgency,</em> and <em>confidence (0–1)</em>.</p>
+      <p class="body-text bold">Belief states are computed from the last 72 hours of signals using a weighted aggregation:</p>
+      <div class="formula-box">
+        <div class="formula">P50 ≈ Σ(confidence_i × veracity_i × decay_i) / Σ(veracity_i × decay_i)</div>
+        <div class="formula-desc">
+          <strong>veracity_i</strong> — source weight (0.40–0.95), reflecting institutional credibility<br>
+          <strong>decay_i</strong> — exponential time decay; signals older than 48h carry &lt;50% weight<br>
+          <strong>P10 / P90</strong> — lower/upper bounds derived from the confidence distribution of contributing signals
+        </div>
+      </div>
+      <ul class="bullets">
+        <li>One IFRC GO emergency event (wt 0.95) contributes more than ~16 GDELT articles (wt 0.60 each)</li>
+        <li>Signals are deduplicated by source: the same article processed twice does not double-count</li>
+        <li>Belief states are cleared and recomputed fresh each cycle — they are not cumulative across cycles</li>
+        <li>The SCQA executive briefing is generated by Claude from the top 20 belief states and refreshed every 30 minutes</li>
+      </ul>
+
+      <div class="sec-header" style="margin-top:20px">Demand Uncertainty Representation</div>
+      <p class="body-text">The demand index is explicitly probabilistic. A single P50 value without its P10–P90 spread is not meaningful — always consider the width of the uncertainty band.</p>
+      <table class="cs-table">
+        <thead><tr><th>Spread (P90−P10)</th><th>Interpretation</th></tr></thead>
+        <tbody>
+          <tr><td>&lt; 0.2</td><td>Narrow — multiple sources agree, high confidence in central estimate</td></tr>
+          <tr><td>0.2 – 0.5</td><td>Moderate — typical for 2–3 sources with mixed recency</td></tr>
+          <tr><td>&gt; 0.5</td><td>Wide — sparse or contradictory signals; plan for worst case (P90)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header" style="margin-top:20px">Historical Hazard Baseline Methodology</div>
+      <p class="body-text">The hazard baseline is computed independently of the real-time signal pipeline. It is a static risk profile derived from historical GDACS event records:</p>
+      <div class="formula-box">
+        <div class="formula">Severity Index = Σ(red events × 3  +  orange × 2  +  green × 1)</div>
+        <div class="formula-desc">
+          Accumulated over 5 calendar years. Reflects cumulative exposure, not peak single-event severity.<br>
+          <strong>GLIDE linkage:</strong> each GDACS event's GLIDE number is matched against the IFRC GO events table to determine whether a formal IFRC response was activated.
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="sec-header">Allocation Methodology — Newsvendor Model</div>
+      <p class="body-text">The allocation engine uses a <strong>stochastic newsvendor model</strong>, the standard operations-research framework for one-period inventory decisions under uncertain demand. The model is applied independently per region, then results are merged.</p>
+      <div class="formula-box">
+        <div class="formula">Q*_i = μ_i + σ_i × Φ⁻¹(CR)</div>
+        <div class="formula-desc">
+          <strong>Q*_i</strong> — optimal allocation quantity for location i<br>
+          <strong>μ_i</strong> — P50 demand estimate from Agent 1 belief state<br>
+          <strong>σ_i</strong> — demand standard deviation ≈ (P90 − P10) / 2.56<br>
+          <strong>Φ⁻¹(CR)</strong> — inverse standard normal at the critical ratio; controls shortfall risk<br>
+          <strong>CR</strong> — varies by ethical scenario (0.70 Speed → 0.95 Conservative)
+        </div>
+      </div>
+      <p class="body-text">After computing Q* per location, two constraints are applied:</p>
+      <ul class="bullets">
+        <li><strong>Equity floor:</strong> every location receives at least its P10 estimate regardless of CR</li>
+        <li><strong>Budget constraint:</strong> if Σ Q*_i &gt; available stock, residuals above the floor are scaled down proportionally so the total does not exceed available stock</li>
+      </ul>
+      <p class="body-text" style="margin-top:8px">The five ethical scenarios represent five distinct values of CR (and one risk-adjusted variant), allowing coordinators to compare the tradeoffs — coverage breadth vs. shortfall protection vs. equity — before selecting and ratifying.</p>
+
+      <div class="sec-header" style="margin-top:20px">Human Oversight Design Principles</div>
+      <p class="body-text bold">The system is designed as a decision-support tool. No stock moves without an explicit human ratification step.</p>
+      <table class="cs-table">
+        <thead><tr><th>Principle</th><th>How it is implemented</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Transparency</strong></td><td>Every AI recommendation shows its inputs — belief states, demand estimates, signal sources — so the coordinator can audit the reasoning</td></tr>
+          <tr><td><strong>Explainability</strong></td><td>The decision brief explicitly names the ethical tradeoffs, shortfall risks, and assumptions underlying the selected scenario</td></tr>
+          <tr><td><strong>Override authority</strong></td><td>Coordinators can override any allocation quantity; overrides are displayed prominently in the brief and audit trail</td></tr>
+          <tr><td><strong>Auditability</strong></td><td>Every ratified run is stored with scenario, overrides, rationale, and timestamp — a permanent record for accountability</td></tr>
+          <tr><td><strong>Impartiality check</strong></td><td>The decision brief explicitly references the IFRC impartiality principle and flags locations where the scenario creates significant inequality</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header" style="margin-top:20px">Known Limitations</div>
+      <div class="limitation-box">
+        <ul class="bullets" style="margin:0">
+          <li><strong>Demand estimates are relative, not absolute</strong> — the P50 index reflects signal intensity, not a physical quantity (MT, units). Map to quantities using reference baselines or field estimates</li>
+          <li><strong>Coverage gaps skew beliefs</strong> — regions with fewer media and NGO reports will show systematically lower demand signals even if need is high</li>
+          <li><strong>72-hour window is a design choice</strong> — slow-onset crises (drought, displacement) may be under-represented relative to acute events</li>
+          <li><strong>GLIDE matching is partial</strong> — approximately 60–70% of major IFRC operations have a GLIDE number; smaller operations and field reports often lack one</li>
+          <li><strong>Newsvendor is a single-period model</strong> — it does not account for resupply cycles, lead times, or dynamic reallocation; treat it as a planning input, not a logistics schedule</li>
+          <li><strong>Claude extraction accuracy varies</strong> — unstructured field messages may produce lower-confidence extractions; always review the signal list behind a belief state before acting on it</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+<div style="max-width:1100px;margin:0 auto 0;padding:0 24px"><hr style="border:none;border-top:1px solid var(--mgray);margin:0"></div>
 
 <!-- ════════════════ AGENT 1 ════════════════ -->
 <div class="page">
