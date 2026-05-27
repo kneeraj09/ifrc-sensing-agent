@@ -352,6 +352,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#222;font-
               onclick="return confirm('Cancel this plan?')">✗ Cancel</button>
           </form>
           {% endif %}
+          {% if plan.plan_status in ('cancelled', 'active', 'completed') %}
+          <button class="btn btn-outline btn-sm"
+            title="Re-run the planner for this allocation run (creates new proposed plans)"
+            onclick="if(confirm('Re-plan allocation run {{ plan.allocation_run_id[:8] }}? This will create new proposed plans.')) triggerPlan('{{ plan.allocation_run_id }}')">
+            ↺ Re-plan
+          </button>
+          {% endif %}
         </div>
       </div>
       {% endfor %}
@@ -776,9 +783,11 @@ function triggerSeed() {
 }
 
 // ── Plan button ───────────────────────────────────────────────────────
-function triggerPlan() {
+function triggerPlan(runId) {
+  // runId is optional — if provided, forces re-planning of that specific run
+  const url = runId ? '/routing/plan?run_id=' + encodeURIComponent(runId) : '/routing/plan';
   ajaxTrigger(
-    '/routing/plan', '/routing/plan/status',
+    url, '/routing/plan/status',
     'plan-dot', 'plan-status-text', 'plan-log-wrap', 'plan-log',
     () => location.reload()
   );

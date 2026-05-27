@@ -964,7 +964,7 @@ def _count_overdue(missions: list[dict]) -> int:
 @app.route("/routing/plan", methods=["POST"])
 def trigger_route_plan():
     """Trigger background route planning from the latest ratified allocation run."""
-    run_id = request.form.get("run_id") or None
+    run_id = request.form.get("run_id") or request.args.get("run_id") or None
     args   = ["route-plan"]
     if run_id:
         args += ["--run-id", run_id]
