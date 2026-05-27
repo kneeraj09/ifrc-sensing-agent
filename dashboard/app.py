@@ -604,6 +604,25 @@ def run_allocation():
             region = b.get("region") or "Global"
             beliefs_by_region[region].append(b)
 
+        # ── Fold "Global" stock into regions that have demand ────────────────
+        # Stock positions entered without a region tag default to "Global".
+        # Rather than silently dropping them when all demand is in a named
+        # region (e.g. Africa), distribute Global stock proportionally across
+        # the regions that actually have belief-state demand.
+        global_stock = stock_by_region.pop("Global", 0.0)
+        regions_with_demand = [r for r in beliefs_by_region if beliefs_by_region[r]]
+        if global_stock > 0:
+            if regions_with_demand:
+                total_belief_count = sum(len(beliefs_by_region[r]) for r in regions_with_demand)
+                for r in regions_with_demand:
+                    share = (len(beliefs_by_region[r]) / max(total_belief_count, 1)) * global_stock
+                    stock_by_region[r] = stock_by_region.get(r, 0.0) + share
+                print(f"[allocation] Distributed {global_stock:.1f} Global stock across "
+                      f"{len(regions_with_demand)} region(s): {regions_with_demand}")
+            else:
+                # No demand anywhere — keep Global so the no-results guard fires
+                stock_by_region["Global"] = global_stock
+
         # Run newsvendor independently per region, then merge results
         all_results = {name: [] for name in SCENARIOS}
         for region, region_stock in sorted(stock_by_region.items()):
