@@ -305,6 +305,98 @@
     </div>
 
   </div>
+
+  <!-- ── Route Planning & Mission Tracking Methodology ── -->
+  <div class="method-header" style="margin-top:32px">Route Planning &amp; Mission Tracking Methodology</div>
+  <div class="method-columns">
+
+    <!-- LEFT: graph theory + scoring -->
+    <div>
+      <div class="sec-header">Route Graph Theory</div>
+      <p class="body-text">The routing engine models the humanitarian logistics network as a <strong>weighted directed graph G = (N, E, w)</strong> where N is the set of 46 waypoints and E is the set of route segments (edges). Each edge carries a composite weight derived from three sources of operational intelligence.</p>
+      <p class="body-text bold">Path-finding: modified Dijkstra maximising composite score</p>
+      <p class="body-text">Standard Dijkstra finds the minimum-cost path. The routing agent <em>negates</em> the composite score to convert it into a cost, then runs a min-heap Dijkstra — effectively finding the <strong>maximum-score path</strong> between origin and destination. This ensures the safest, most reliable route is selected over the fastest one.</p>
+      <ul class="bullets">
+        <li>All candidate paths through the 46-node graph are evaluated simultaneously — the planner is not greedy</li>
+        <li>If no path exists (disconnected graph), the plan is skipped and the coordinator is notified</li>
+        <li>Auto-edges (synthetic connections for node pairs within 1,200 km) guarantee full graph connectivity before real segment data is entered — they score 0.75 by default</li>
+        <li>The graph is rebuilt from the database on every planner call, so segment score updates (from new ACLED/GDACS data) are reflected immediately</li>
+      </ul>
+
+      <div class="sec-header" style="margin-top:20px">Composite Score — Detailed Breakdown</div>
+      <div class="formula-box">
+        <div class="formula">Score = 0.50 × min_safety + 0.30 × prod_reliability − 0.20 × norm_time</div>
+        <div class="formula-desc">
+          <strong>min_safety</strong> = min(safety_i for all segments i on path)<br>
+          Uses the <em>weakest-link principle</em> — a single dangerous segment contaminates the entire route score, regardless of how safe the other segments are. Reflects the operational reality that a convoy must pass through every segment, not choose among them.<br><br>
+          <strong>prod_reliability</strong> = Π(reliability_i for all segments i on path)<br>
+          Models the <em>joint probability</em> that every segment completes without disruption. For a 4-segment route with 0.90 reliability on each leg: 0.90⁴ ≈ 0.66 — meaning a one-in-three chance of at least one disruption. This penalises long routes through many uncertain segments even if each individual segment looks acceptable.<br><br>
+          <strong>norm_time</strong> = path_hours / max_hours_across_candidates<br>
+          Normalised 0–1 across all candidate paths for this origin–destination pair. Carries the lowest weight (0.20) — the system optimises for safety first, reliability second, speed third.
+        </div>
+      </div>
+
+      <div class="sec-header" style="margin-top:20px">Segment Score Computation</div>
+      <p class="body-text">Each segment's safety and reliability scores are computed from three independent inputs blended as a weighted prior:</p>
+      <div class="formula-box">
+        <div class="formula">score = 1 − (0.40 × acled_risk + 0.30 × gdacs_risk + 0.30 × (1 − manual_score))</div>
+        <div class="formula-desc">
+          <strong>acled_risk</strong> — conflict density within 150 km of the segment midpoint. Each ACLED event contributes: weight × exp(−days_old / 43.3) where weight = 1.0 (immediate), 0.8 (24h), 0.5 (72h), 0.2 (low). The 43.3-day decay constant corresponds to a 30-day half-life.<br><br>
+          <strong>gdacs_risk</strong> — sum of tier penalties for active GDACS alerts near the segment: critical −0.45, high −0.30, medium −0.15, low −0.05. Multiple concurrent events accumulate.<br><br>
+          <strong>manual_score</strong> — coordinator-entered reliability score (0–1) for the segment; defaults to 0.75 when no data is available. A coordinator who knows a road is compromised can set this to 0.1 to effectively remove the segment from the optimal path.<br><br>
+          Final scores are clamped to [0.05, 0.99] — no segment is ever rated perfectly safe or entirely impassable.
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: mission tracking + disruption detection + limitations -->
+    <div>
+      <div class="sec-header">Mission Lifecycle &amp; Tracking Model</div>
+      <p class="body-text">A <strong>mission</strong> is created when a coordinator activates an approved route plan. It tracks the physical movement of a convoy from departure to delivery.</p>
+      <table class="cs-table">
+        <thead><tr><th>Event</th><th>What is recorded</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Activation</strong></td><td>Vehicle details, driver name, estimated departure time, allocated quantity</td></tr>
+          <tr><td><strong>Check-in</strong></td><td>Timestamp, current location (text), status (on_track / delayed / at_risk), coordinator notes</td></tr>
+          <tr><td><strong>Disruption</strong></td><td>Source signal ID, type, location, description, severity — linked to the triggering Agent 1 signal</td></tr>
+          <tr><td><strong>Completion</strong></td><td>Actual arrival time, delivery confirmation, final notes</td></tr>
+          <tr><td><strong>Abort</strong></td><td>Reason, last known location, recommended follow-up action</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header" style="margin-top:20px">Disruption Detection Algorithm</div>
+      <p class="body-text">After each Agent 1 sensing cycle, the monitor checks all active missions for emerging threats:</p>
+      <ol class="steps">
+        <li data-n="1">For each active mission, retrieve its route segments from the graph</li>
+        <li data-n="2">Compute the <strong>midpoint</strong> (lat/lon) of each segment using the haversine centroid of its two endpoint nodes</li>
+        <li data-n="3">Search all Agent 1 signals from the last sensing cycle for signals of type <em>conflict, access, risk,</em> or <em>infrastructure</em></li>
+        <li data-n="4">For each such signal, compute haversine distance from the signal location to each segment midpoint</li>
+        <li data-n="5">If any signal falls within <strong>200 km</strong> of a segment midpoint, create a <code>route_disruption</code> record and flag the mission</li>
+        <li data-n="6">Coordinator sees the disruption on the Routing dashboard and can log a resolution once the threat has passed</li>
+      </ol>
+
+      <div class="sec-header" style="margin-top:20px">Overdue Check-in Detection</div>
+      <div class="formula-box">
+        <div class="formula">overdue = (now − last_checkin_time) &gt; 6 hours</div>
+        <div class="formula-desc">
+          Checked independently for every active mission on each monitor run. A mission with no check-ins is measured from its activation timestamp. The 6-hour threshold is a configurable constant (<code>MISSION_CHECKIN_ALERT_HOURS</code>) — adjust in <code>config.py</code> to match operational context (e.g. 2h for high-risk corridors, 12h for stable long-distance routes).
+        </div>
+      </div>
+
+      <div class="sec-header" style="margin-top:20px">Routing Known Limitations</div>
+      <div class="limitation-box">
+        <ul class="bullets" style="margin:0">
+          <li><strong>Graph covers Africa only</strong> — the 46 seeded waypoints are East/Central/Southern/West/North Africa. Cross-continental routing is not yet supported</li>
+          <li><strong>Auto-edges approximate, not actual roads</strong> — a 1,200 km auto-edge between two nodes does not verify that a paved road corridor exists; always confirm feasibility before activating a mission</li>
+          <li><strong>ORS fallback is a straight-line estimate</strong> — without an ORS API key, distances are haversine × 1.4 (road factor) and speeds are fixed at 50 km/h; actual convoy times will vary</li>
+          <li><strong>Segment scores lag events</strong> — scores reflect signals ingested up to the last sensing cycle; a rapidly escalating situation may not appear in scores until the next ingestion run</li>
+          <li><strong>200 km disruption radius is conservative</strong> — in open terrain, a conflict 200 km away may be irrelevant; in narrow corridors or chokepoints, even 50 km matters. Coordinator judgement is essential</li>
+          <li><strong>Single-path output</strong> — the planner returns the one highest-scoring path; it does not show alternative routes. Review the waypoints map to check if an obvious safer detour exists</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
 </div>
 <div style="max-width:1100px;margin:0 auto 0;padding:0 24px"><hr style="border:none;border-top:1px solid var(--mgray);margin:0"></div>
 
