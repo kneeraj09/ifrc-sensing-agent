@@ -26,10 +26,20 @@
     .card { background:var(--white); border:1px solid var(--gray-300); border-radius:8px; margin-bottom:12px; overflow:hidden; }
     .card-header { background:var(--navy); color:var(--white); padding:10px 18px; font-size:11px; font-weight:600; letter-spacing:.8px; text-transform:uppercase; }
     .card-body { padding:18px 20px; }
+    /* Stock form — CSS Grid so every label sits directly above its own input */
+    .stock-form-grid {
+      display: grid;
+      grid-template-columns: 130px 160px 130px 100px 110px 130px auto;
+      gap: 10px;
+      align-items: end;
+    }
+    @media (max-width: 900px) {
+      .stock-form-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
     .form-row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
     .form-field { display:flex; flex-direction:column; gap:4px; }
-    .form-field label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--gray-700); }
-    .form-field input, .form-field select { border:1px solid var(--gray-300); border-radius:4px; padding:7px 10px; font-size:13px; font-family:inherit; color:var(--gray-900); min-width:140px; }
+    .form-field label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--gray-700); white-space:nowrap; }
+    .form-field input, .form-field select { width:100%; border:1px solid var(--gray-300); border-radius:4px; padding:7px 10px; font-size:13px; font-family:inherit; color:var(--gray-900); box-sizing:border-box; }
     .form-field input:focus, .form-field select:focus { outline:none; border-color:var(--navy); }
     .btn { padding:8px 18px; font-size:12px; font-weight:600; border-radius:4px; border:none; cursor:pointer; }
     .btn-navy  { background:var(--navy); color:var(--white); }
@@ -116,7 +126,7 @@
   <div class="card">
     <div class="card-body">
       <form method="POST" action="/allocation/stock">
-        <div class="form-row">
+        <div class="stock-form-grid">
           <div class="form-field">
             <label>Commodity</label>
             <select name="commodity">
@@ -129,7 +139,7 @@
           </div>
           <div class="form-field">
             <label>Depot / Origin</label>
-            <input type="text" name="depot_location" placeholder="e.g. Nairobi warehouse">
+            <input type="text" name="depot_location" placeholder="e.g. Nairobi">
           </div>
           <div class="form-field">
             <label>Region</label>
@@ -151,7 +161,7 @@
           </div>
           <div class="form-field">
             <label>Unit</label>
-            <input type="text" name="unit" placeholder="MT / pallets / boxes">
+            <input type="text" name="unit" placeholder="MT / pallets">
           </div>
           <div class="form-field">
             <label>As of date</label>
