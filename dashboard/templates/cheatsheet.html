@@ -254,8 +254,9 @@
           <strong>Q*_i</strong> — optimal allocation quantity for location i<br>
           <strong>μ_i</strong> — P50 demand estimate from Agent 1 belief state<br>
           <strong>σ_i</strong> — demand standard deviation ≈ (P90 − P10) / 2.56<br>
-          <strong>Φ⁻¹(CR)</strong> — inverse standard normal at the critical ratio; controls shortfall risk<br>
-          <strong>CR</strong> — varies by ethical scenario (0.70 Speed → 0.95 Conservative)
+          <strong>Φ⁻¹(CR)</strong> — inverse standard normal CDF at the critical ratio. Converts a probability into a z-score: how many σ above the mean to stock in order to meet demand with probability CR. This is the "safety stock multiplier".<br>
+          <strong>CR</strong> — critical ratio, the ethical service-level target: 0.70 Speed → 0.85 Balanced → 0.90 Equity → 0.95 Conservative<br>
+          <strong>Key values:</strong> Φ⁻¹(0.50)=0.00 &nbsp;·&nbsp; Φ⁻¹(0.70)=0.52 &nbsp;·&nbsp; Φ⁻¹(0.85)=1.04 &nbsp;·&nbsp; Φ⁻¹(0.90)=1.28 &nbsp;·&nbsp; Φ⁻¹(0.95)=1.64
         </div>
       </div>
       <p class="body-text">After computing Q* per location, two constraints are applied:</p>
@@ -677,12 +678,23 @@
       <p class="body-text">The agent uses a <strong>multi-location newsvendor model</strong> to compute how to allocate a fixed regional stock across multiple locations under demand uncertainty. It uses the P10/P50/P90 demand estimates from Agent 1 as inputs.</p>
       <p class="body-text navy">Optimal quantity per location: Q* = μ + σ × Φ⁻¹(critical ratio)</p>
       <ul class="bullets">
-        <li><strong>μ</strong> = P50 demand estimate (central case)</li>
-        <li><strong>σ</strong> = demand spread, derived from P10–P90 range</li>
-        <li><strong>Critical ratio</strong> = the ethical stance on risk — higher means fewer shortfalls</li>
-        <li>An <strong>equity floor</strong> guarantees every location receives at least its P10 estimate</li>
-        <li>If total Q* exceeds regional stock, residuals are scaled down proportionally after floors are paid</li>
+        <li><strong>μ</strong> = P50 demand estimate (the median signal from Agent 1)</li>
+        <li><strong>σ</strong> = demand spread ≈ (P90 − P10) ÷ 2.56  (maps the 80% interval to standard deviations)</li>
+        <li><strong>Φ⁻¹</strong> = inverse standard normal CDF — converts a probability into a z-score (how many σ above the mean you must stock to cover demand with that probability). Example: Φ⁻¹(0.85) ≈ 1.04, so an 85% service level adds 1.04 × σ as safety stock above the median</li>
+        <li><strong>Critical ratio</strong> = the ethical stance on acceptable risk of shortfall — higher means fewer shortfalls but uses more stock per location</li>
+        <li>An <strong>equity floor</strong> guarantees every location receives at least its P10 estimate regardless of CR</li>
+        <li>If total Q* exceeds regional stock, residuals above the floor are scaled down proportionally</li>
       </ul>
+      <table class="cs-table" style="margin-top:8px">
+        <thead><tr><th>Scenario</th><th>Critical Ratio</th><th>Φ⁻¹(CR)</th><th>Safety stock</th></tr></thead>
+        <tbody>
+          <tr><td>Speed</td>       <td>0.70</td><td>0.52</td><td>+0.52 σ above median</td></tr>
+          <tr><td>Balanced</td>    <td>0.85</td><td>1.04</td><td>+1.04 σ above median</td></tr>
+          <tr><td>Equity</td>      <td>0.90</td><td>1.28</td><td>+1.28 σ above median</td></tr>
+          <tr><td>Critical First</td><td>0.85 + adj</td><td>≈1.04 + risk adj</td><td>High-risk sites boosted</td></tr>
+          <tr><td>Conservative</td><td>0.95</td><td>1.64</td><td>+1.64 σ above median</td></tr>
+        </tbody>
+      </table>
 
       <div class="sec-header">The 5 Ethical Scenarios</div>
       <div class="scenario-grid">

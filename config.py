@@ -79,3 +79,17 @@ GDELT_QUERY = (
     "OR displaced OR humanitarian OR \"food insecurity\" OR \"access constraints\""
 )
 GDELT_MAX_RECORDS = 20
+
+# OpenRouteService — free OSM-based routing API (Africa coverage)
+# Register for a free key at: https://openrouteservice.org/
+# Falls back to haversine × 1.4 road factor at 50 km/h if key is not set
+ORS_API_KEY = os.getenv("ORS_API_KEY", "")
+
+# Routing weights for composite route score
+# score = w_safety × min_safety + w_reliability × prod_reliability − w_time × norm_time
+ROUTE_W_SAFETY      = 0.50
+ROUTE_W_RELIABILITY = 0.30
+ROUTE_W_TIME        = 0.20
+
+# Mission check-in: alert if no update received within this many hours
+MISSION_CHECKIN_ALERT_HOURS = 6

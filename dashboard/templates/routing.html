@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Routing & Execution — IFRC Sensing Agent</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+/* ── Base ──────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#222;font-size:14px}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+.header{background:#1A2744;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:1.15rem;font-weight:700;letter-spacing:.3px}
+.header h1 span{color:#C8102E}
+.header-sub{font-size:.78rem;opacity:.7;margin-top:2px}
+.nav-links{display:flex;gap:8px;flex-wrap:wrap}
+.nav-btn{padding:5px 12px;border-radius:4px;font-size:.78rem;font-weight:600;text-decoration:none;border:1.5px solid rgba(255,255,255,.35);color:#fff;transition:.15s}
+.nav-btn:hover{background:rgba(255,255,255,.12)}
+.nav-btn.active{background:#C8102E;border-color:#C8102E}
+
+/* ── Stats bar ─────────────────────────────────────────────────────────── */
+.stats-bar{display:flex;gap:12px;padding:14px 24px;background:#fff;border-bottom:1px solid #e0e3e8;flex-wrap:wrap}
+.stat-card{background:#f4f6f8;border-radius:6px;padding:10px 18px;text-align:center;min-width:90px}
+.stat-num{font-size:1.6rem;font-weight:700;color:#1A2744;line-height:1}
+.stat-num.red{color:#C8102E}
+.stat-num.amber{color:#d97706}
+.stat-num.green{color:#16a34a}
+.stat-label{font-size:.72rem;color:#666;margin-top:3px;text-transform:uppercase;letter-spacing:.4px}
+
+/* ── Action bar ─────────────────────────────────────────────────────────── */
+.action-bar{padding:12px 24px;background:#fff;border-bottom:1px solid #e0e3e8;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{padding:7px 16px;border-radius:5px;font-size:.82rem;font-weight:600;cursor:pointer;border:none;transition:.15s}
+.btn-primary{background:#C8102E;color:#fff}.btn-primary:hover{background:#a30e27}
+.btn-success{background:#16a34a;color:#fff}.btn-success:hover{background:#14803c}
+.btn-outline{background:#fff;color:#1A2744;border:1.5px solid #1A2744}.btn-outline:hover{background:#f0f2f5}
+.btn-danger{background:#fff;color:#C8102E;border:1.5px solid #C8102E}.btn-danger:hover{background:#fff5f5}
+.btn-sm{padding:4px 10px;font-size:.76rem}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.main-layout{display:grid;grid-template-columns:1fr 380px;gap:0;height:calc(100vh - 160px);overflow:hidden}
+.left-panel{overflow-y:auto;padding:18px 20px}
+.right-panel{border-left:1px solid #dde1e8;display:flex;flex-direction:column;background:#fff}
+
+/* ── Map ─────────────────────────────────────────────────────────────────── */
+#route-map{flex:1;min-height:300px}
+
+/* ── Map legend ──────────────────────────────────────────────────────────── */
+.map-legend{padding:10px 14px;border-top:1px solid #e0e3e8;font-size:.75rem;background:#f8f9fb}
+.map-legend h4{font-size:.78rem;color:#1A2744;margin-bottom:6px;font-weight:700}
+.legend-item{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.tabs{display:flex;border-bottom:2px solid #e0e3e8;padding:0 20px;background:#f8f9fb}
+.tab{padding:9px 16px;font-size:.82rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:#666;transition:.15s}
+.tab.active{color:#1A2744;border-bottom-color:#C8102E}
+.tab:hover:not(.active){color:#333}
+.tab-content{display:none}.tab-content.active{display:block}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.section-title{font-size:.88rem;font-weight:700;color:#1A2744;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.data-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.data-table th{background:#f0f2f5;color:#444;font-weight:600;padding:8px 10px;text-align:left;border-bottom:2px solid #dde1e8;white-space:nowrap}
+.data-table td{padding:8px 10px;border-bottom:1px solid #eef0f3;vertical-align:top}
+.data-table tr:hover td{background:#fafbfc}
+.empty-row td{color:#999;font-style:italic;text-align:center;padding:20px}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:.72rem;font-weight:600;white-space:nowrap}
+.badge-proposed{background:#e0e7ff;color:#3730a3}
+.badge-approved{background:#dcfce7;color:#15803d}
+.badge-active{background:#fef9c3;color:#854d0e}
+.badge-completed{background:#f0f9ff;color:#0369a1}
+.badge-cancelled{background:#fef2f2;color:#991b1b}
+.badge-preparing{background:#f3e8ff;color:#6b21a8}
+.badge-in_transit{background:#fef9c3;color:#854d0e}
+.badge-delayed{background:#fff7ed;color:#c2410c}
+.badge-aborted{background:#fee2e2;color:#991b1b}
+.badge-critical{background:#fee2e2;color:#991b1b}
+.badge-high{background:#fff7ed;color:#c2410c}
+.badge-medium{background:#fefce8;color:#854d0e}
+.badge-low{background:#f0fdf4;color:#15803d}
+.badge-hub{background:#eff6ff;color:#1d4ed8}
+.badge-port{background:#ecfdf5;color:#065f46}
+.badge-forward{background:#fff7ed;color:#c2410c}
+.badge-waypoint{background:#f9fafb;color:#374151}
+
+/* ── Score bar ───────────────────────────────────────────────────────────── */
+.score-bar{display:flex;align-items:center;gap:6px}
+.score-fill{height:8px;border-radius:4px;background:#16a34a}
+.score-track{width:60px;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;flex-shrink:0}
+
+/* ── Plan card ───────────────────────────────────────────────────────────── */
+.plan-card{background:#fff;border:1px solid #dde1e8;border-radius:8px;padding:14px 16px;margin-bottom:12px;transition:.15s}
+.plan-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.plan-card.overdue{border-left:4px solid #C8102E}
+.plan-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.plan-route{font-weight:700;color:#1A2744;font-size:.9rem}
+.plan-meta{font-size:.76rem;color:#666;margin-top:2px}
+.plan-details{display:flex;gap:16px;flex-wrap:wrap;font-size:.78rem;color:#555;margin-top:8px}
+.plan-detail{display:flex;align-items:center;gap:4px}
+.plan-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+
+/* ── Disruption card ─────────────────────────────────────────────────────── */
+.disrupt-card{border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:4px solid #C8102E;background:#fff5f5}
+.disrupt-card.high{border-color:#d97706;background:#fff7ed}
+.disrupt-card.medium{border-color:#ca8a04;background:#fefce8}
+.disrupt-card.low{border-color:#16a34a;background:#f0fdf4}
+.disrupt-card.resolved{border-color:#9ca3af;background:#f9fafb;opacity:.65}
+.disrupt-title{font-weight:600;font-size:.83rem;color:#1A2744}
+.disrupt-meta{font-size:.75rem;color:#666;margin-top:2px}
+.disrupt-desc{font-size:.78rem;color:#444;margin-top:5px}
+
+/* ── Modal overlay ───────────────────────────────────────────────────────── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:10px;padding:24px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:1rem;font-weight:700;color:#1A2744;margin-bottom:16px}
+.form-row{margin-bottom:12px}
+.form-row label{display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:4px}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1.5px solid #d1d5db;border-radius:5px;font-size:.82rem;font-family:inherit}
+.form-row textarea{resize:vertical;min-height:60px}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* ── Status log ──────────────────────────────────────────────────────────── */
+.status-log{font-size:.75rem;font-family:monospace;background:#1e293b;color:#94a3b8;padding:10px;border-radius:6px;max-height:120px;overflow-y:auto;margin-top:8px;white-space:pre-wrap;word-break:break-all}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.status-dot.idle{background:#9ca3af}
+.status-dot.running{background:#f59e0b;animation:pulse .8s infinite alternate}
+.status-dot.done{background:#16a34a}
+.status-dot.error{background:#C8102E}
+@keyframes pulse{to{opacity:.3}}
+
+/* ── Node table ──────────────────────────────────────────────────────────── */
+.node-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.node-chip{padding:6px 10px;border-radius:6px;border:1px solid #dde1e8;background:#f8f9fb;font-size:.77rem}
+.node-chip-name{font-weight:600;color:#1A2744}
+.node-chip-meta{color:#888;font-size:.72rem;margin-top:1px}
+</style>
+</head>
+
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<div class="header">
+  <div>
+    <h1>IFRC <span>Sensing Agent</span> — Routing &amp; Execution</h1>
+    <div class="header-sub">Agent 4 · Convoy Planning · Mission Monitoring</div>
+  </div>
+  <nav class="nav-links">
+    <a href="/"           class="nav-btn">Situation</a>
+    <a href="/demand"     class="nav-btn">Demand</a>
+    <a href="/allocation" class="nav-btn">Allocation</a>
+    <a href="/hazard"     class="nav-btn">Hazard</a>
+    <a href="/routing"    class="nav-btn active">Routing</a>
+    <a href="/cheatsheet" class="nav-btn">Field Guide</a>
+  </nav>
+</div>
+
+<!-- ── Stats bar ─────────────────────────────────────────────────────── -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-num">{{ stats.total_plans }}</div>
+    <div class="stat-label">Route Plans</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#3730a3">{{ stats.proposed }}</div>
+    <div class="stat-label">Proposed</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num green">{{ stats.approved }}</div>
+    <div class="stat-label">Approved</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num amber">{{ stats.active }}</div>
+    <div class="stat-label">In Transit</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num {% if stats.overdue > 0 %}red{% endif %}">{{ stats.overdue }}</div>
+    <div class="stat-label">Overdue</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num {% if stats.disruptions > 0 %}red{% endif %}">{{ stats.disruptions }}</div>
+    <div class="stat-label">Disruptions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#1A2744">{{ nodes|length }}</div>
+    <div class="stat-label">Waypoints</div>
+  </div>
+</div>
+
+<!-- ── Action bar ────────────────────────────────────────────────────── -->
+<div class="action-bar">
+  <form method="POST" action="/routing/plan" id="plan-form" style="display:inline">
+    <button type="submit" class="btn btn-primary" onclick="startPlanPoll()">
+      ▶ Plan Routes from Latest Ratified Run
+    </button>
+  </form>
+  <button class="btn btn-outline btn-sm" onclick="document.getElementById('disruption-modal').classList.add('open')">
+    + Log Disruption
+  </button>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.78rem">
+    <span class="status-dot {{ plan_state.status }}"></span>
+    <span id="plan-status-text" style="color:#666">
+      {{ plan_state.status | capitalize }}
+    </span>
+  </div>
+</div>
+
+{% if plan_state.log %}
+<div style="padding:0 24px 8px">
+  <div class="status-log" id="plan-log">{{ plan_state.log | join('\n') }}</div>
+</div>
+{% endif %}
+
+<!-- ── Main layout: left tabs + right map ─────────────────────────────── -->
+<div class="main-layout">
+
+  <!-- Left: tabs -->
+  <div class="left-panel">
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('plans',this)">Route Plans</div>
+      <div class="tab" onclick="showTab('missions',this)">Active Missions</div>
+      <div class="tab" onclick="showTab('disruptions',this)">Disruptions</div>
+      <div class="tab" onclick="showTab('nodes',this)">Waypoints</div>
+    </div>
+
+    <!-- ── Plans tab ──────────────────────────────────────────────── -->
+    <div id="tab-plans" class="tab-content active" style="padding-top:14px">
+
+      {% if not plans %}
+      <div style="text-align:center;padding:40px 20px;color:#888">
+        <div style="font-size:2rem;margin-bottom:10px">🗺</div>
+        <div style="font-weight:600;margin-bottom:6px">No route plans yet</div>
+        <div style="font-size:.82rem">Ratify an allocation run in Agent 3, then click
+          <strong>Plan Routes</strong> above.</div>
+      </div>
+      {% endif %}
+
+      {% for plan in plans %}
+      {% set route = plan.route_json %}
+      {% set origin_n = plan.origin_node_detail %}
+      {% set dests = plan.dest_node_details %}
+      <div class="plan-card {% if plan.plan_status in ('proposed','approved') and stats.overdue > 0 %}{% endif %}">
+        <div class="plan-header">
+          <div>
+            <div class="plan-route">
+              {{ origin_n.get('name', plan.origin_node) or plan.origin_node }}
+              →
+              {% for d in dests %}{{ d.get('name', '?') }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </div>
+            <div class="plan-meta">
+              {{ plan.commodity | capitalize }} · {{ plan.quantity | int if plan.quantity else '?' }} {{ plan.unit }}
+              · Run {{ plan.allocation_run_id[:8] if plan.allocation_run_id else '—' }}
+            </div>
+          </div>
+          <span class="badge badge-{{ plan.plan_status }}">{{ plan.plan_status | replace('_',' ') | title }}</span>
+        </div>
+
+        <div class="plan-details">
+          {% if plan.total_km %}
+          <div class="plan-detail">📏 {{ plan.total_km | round(0) | int }} km</div>
+          {% endif %}
+          {% if plan.est_hours %}
+          <div class="plan-detail">⏱ {{ plan.est_hours | round(1) }}h</div>
+          {% endif %}
+          {% if plan.composite_score is not none %}
+          <div class="plan-detail score-bar">
+            🎯
+            <div class="score-track">
+              <div class="score-fill" style="width:{{ (plan.composite_score * 100) | round | int }}%;
+                background:{% if plan.composite_score >= 0.7 %}#16a34a{% elif plan.composite_score >= 0.4 %}#d97706{% else %}#C8102E{% endif %}"></div>
+            </div>
+            {{ "%.2f"|format(plan.composite_score) }}
+          </div>
+          {% endif %}
+          {% if route.get('ors_used') %}
+          <div class="plan-detail" title="Distance from OpenRouteService API">🛰 ORS</div>
+          {% else %}
+          <div class="plan-detail" title="Distance estimated via haversine × 1.4">📐 Est.</div>
+          {% endif %}
+        </div>
+
+        {% if route.get('path_labels') %}
+        <div style="font-size:.75rem;color:#666;margin-top:6px;background:#f8f9fb;padding:5px 8px;border-radius:4px">
+          🔗 {{ route.path_labels | join(' → ') }}
+        </div>
+        {% endif %}
+
+        {% if plan.planner_notes %}
+        <div style="font-size:.73rem;color:#888;margin-top:5px;font-style:italic">{{ plan.planner_notes }}</div>
+        {% endif %}
+
+        <div class="plan-actions">
+          {% if plan.plan_status == 'proposed' %}
+          <form method="POST" action="/routing/plan/{{ plan.id }}/approve" style="display:inline">
+            <button class="btn btn-success btn-sm" type="submit">✓ Approve</button>
+          </form>
+          <form method="POST" action="/routing/plan/{{ plan.id }}/cancel" style="display:inline">
+            <button class="btn btn-danger btn-sm" type="submit"
+              onclick="return confirm('Cancel this plan?')">✗ Cancel</button>
+          </form>
+          {% elif plan.plan_status == 'approved' %}
+          <button class="btn btn-primary btn-sm"
+            onclick="openActivateModal('{{ plan.id }}','{{ origin_n.get('name','?') }}','{% for d in dests %}{{ d.get('name','?') }}{% endfor %}')">
+            🚛 Activate Mission
+          </button>
+          <form method="POST" action="/routing/plan/{{ plan.id }}/cancel" style="display:inline">
+            <button class="btn btn-danger btn-sm" type="submit"
+              onclick="return confirm('Cancel this plan?')">✗ Cancel</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div><!-- /tab-plans -->
+
+    <!-- ── Missions tab ────────────────────────────────────────────── -->
+    <div id="tab-missions" class="tab-content" style="padding-top:14px">
+
+      {% if not missions %}
+      <div style="text-align:center;padding:40px 20px;color:#888">
+        <div style="font-size:2rem;margin-bottom:10px">🚛</div>
+        <div style="font-weight:600;margin-bottom:6px">No active missions</div>
+        <div style="font-size:.82rem">Approve a route plan and activate it as a mission.</div>
+      </div>
+      {% endif %}
+
+      {% for m in missions %}
+      {% set is_overdue = m.mission_status in ('in_transit','delayed') and m.last_checkin_at %}
+      <div class="plan-card {% if is_overdue %}overdue{% endif %}">
+        <div class="plan-header">
+          <div>
+            <div class="plan-route">Mission {{ m.id[:8] }}
+              {% if m.plan %}
+              <span style="font-size:.8rem;font-weight:400;color:#666">
+                · {{ m.plan.get('commodity','?') | capitalize }}
+              </span>
+              {% endif %}
+            </div>
+            <div class="plan-meta">
+              Contact: {{ m.driver_contact or '—' }}
+              · Convoy: {{ m.convoy_size or 1 }} vehicle(s)
+            </div>
+          </div>
+          <span class="badge badge-{{ m.mission_status }}">{{ m.mission_status | replace('_',' ') | title }}</span>
+        </div>
+
+        <div class="plan-details">
+          <div class="plan-detail">📍 {{ m.last_position or 'Unknown' }}</div>
+          {% if m.departure_time %}
+          <div class="plan-detail">🕐 Dep: {{ m.departure_time[:16] | replace('T',' ') }}</div>
+          {% endif %}
+          {% if m.expected_arrival %}
+          <div class="plan-detail">🏁 ETA: {{ m.expected_arrival[:16] | replace('T',' ') }}</div>
+          {% endif %}
+          {% if m.last_checkin_at %}
+          <div class="plan-detail">📡 Last check-in: {{ m.last_checkin_at[:16] | replace('T',' ') }}</div>
+          {% endif %}
+        </div>
+
+        {% if m.recent_checkins %}
+        <div style="margin-top:8px">
+          {% for c in m.recent_checkins %}
+          <div style="font-size:.74rem;color:#555;padding:3px 0;border-top:1px dashed #e5e7eb">
+            {{ c.checkin_time[:16] | replace('T',' ') }}
+            · {{ c.position_name or '?' }}
+            {% if c.status_note %} · <em>{{ c.status_note }}</em>{% endif %}
+            <span style="color:#9ca3af;font-size:.7rem"> [{{ c.source }}]</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="plan-actions">
+          <button class="btn btn-outline btn-sm"
+            onclick="openCheckinModal('{{ m.id }}')">📡 Check-in</button>
+          {% if m.mission_status not in ('completed','aborted') %}
+          <form method="POST" action="/routing/mission/{{ m.id }}/complete" style="display:inline">
+            <button class="btn btn-success btn-sm" type="submit"
+              onclick="return confirm('Mark mission as completed?')">✓ Complete</button>
+          </form>
+          <form method="POST" action="/routing/mission/{{ m.id }}/abort" style="display:inline">
+            <button class="btn btn-danger btn-sm" type="submit"
+              onclick="return confirm('Abort this mission?')">✗ Abort</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div><!-- /tab-missions -->
+
+    <!-- ── Disruptions tab ────────────────────────────────────────── -->
+    <div id="tab-disruptions" class="tab-content" style="padding-top:14px">
+
+      {% set active_d  = disruptions | selectattr('active','equalto',1) | list %}
+      {% set resolved  = disruptions | rejectattr('active','equalto',1) | list %}
+
+      {% if active_d %}
+      <div class="section-title" style="color:#C8102E">⚠ Active Disruptions ({{ active_d|length }})</div>
+      {% for d in active_d %}
+      <div class="disrupt-card {{ d.severity }}">
+        <div class="plan-header" style="margin-bottom:4px">
+          <div class="disrupt-title">{{ d.disruption_type | replace('_',' ') | title }}
+            {% if d.segment_id %}<span style="font-weight:400;font-size:.78rem;color:#888"> · {{ d.segment_id }}</span>{% endif %}
+          </div>
+          <span class="badge badge-{{ d.severity }}">{{ d.severity | title }}</span>
+        </div>
+        <div class="disrupt-meta">
+          Reported: {{ d.reported_at[:16] | replace('T',' ') }}
+          {% if d.expires_at %} · Expires: {{ d.expires_at[:16] | replace('T',' ') }}{% endif %}
+          · Source: {{ d.source }}
+        </div>
+        {% if d.description %}
+        <div class="disrupt-desc">{{ d.description }}</div>
+        {% endif %}
+        <div style="margin-top:8px">
+          <form method="POST" action="/routing/disruption/{{ d.id }}/resolve" style="display:inline">
+            <button class="btn btn-outline btn-sm" type="submit">✓ Resolve</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if resolved %}
+      <div class="section-title" style="margin-top:16px;color:#9ca3af">Resolved ({{ resolved|length }})</div>
+      {% for d in resolved[:10] %}
+      <div class="disrupt-card resolved">
+        <div class="disrupt-title">{{ d.disruption_type | replace('_',' ') | title }}
+          <span style="font-weight:400;font-size:.75rem;color:#9ca3af"> · {{ d.reported_at[:10] }}</span>
+        </div>
+        {% if d.description %}
+        <div class="disrupt-desc">{{ d.description }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if not disruptions %}
+      <div style="text-align:center;padding:40px 20px;color:#888">
+        <div style="font-size:2rem;margin-bottom:10px">✅</div>
+        <div style="font-weight:600">No disruptions logged</div>
+      </div>
+      {% endif %}
+    </div><!-- /tab-disruptions -->
+
+    <!-- ── Waypoints tab ──────────────────────────────────────────── -->
+    <div id="tab-nodes" class="tab-content" style="padding-top:14px">
+      <div class="section-title">{{ nodes|length }} Waypoints in Graph</div>
+      {% if not nodes %}
+      <div style="text-align:center;padding:30px;color:#888">
+        <div style="font-weight:600;margin-bottom:6px">No waypoints seeded</div>
+        <div style="font-size:.82rem">Run <code>python main.py route-seed</code> to load the Africa network.</div>
+      </div>
+      {% else %}
+      <div class="node-grid">
+        {% for n in nodes | sort(attribute='name') %}
+        <div class="node-chip">
+          <div class="node-chip-name">{{ n.name }}</div>
+          <div class="node-chip-meta">
+            <span class="badge badge-{{ n.node_type }}" style="font-size:.67rem;padding:1px 5px">{{ n.node_type }}</span>
+            {{ n.country }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div><!-- /tab-nodes -->
+
+  </div><!-- /left-panel -->
+
+  <!-- Right: map -->
+  <div class="right-panel">
+    <div id="route-map"></div>
+    <div class="map-legend">
+      <h4>Map Legend</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#1d4ed8"></div> Hub</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#065f46"></div> Port</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#c2410c"></div> Forward base</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#374151"></div> Waypoint</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#C8102E;border-radius:2px"></div> Active route</div>
+    </div>
+  </div>
+
+</div><!-- /main-layout -->
+
+
+<!-- ── Modal: Activate mission ──────────────────────────────────────── -->
+<div class="modal-overlay" id="activate-modal">
+  <div class="modal">
+    <h3>🚛 Activate Mission</h3>
+    <form method="POST" id="activate-form">
+      <div class="form-row">
+        <label>Route</label>
+        <input type="text" id="activate-route-label" readonly style="background:#f4f6f8">
+      </div>
+      <div class="form-row">
+        <label>Driver / Convoy Contact</label>
+        <input type="text" name="driver_contact" placeholder="Name, phone or radio call sign">
+      </div>
+      <div class="form-row">
+        <label>Convoy Size (vehicles)</label>
+        <input type="number" name="convoy_size" value="1" min="1" max="50">
+      </div>
+      <div class="form-row">
+        <label>Departure Time (UTC)</label>
+        <input type="datetime-local" name="departure_time">
+      </div>
+      <div class="form-row">
+        <label>Expected Arrival (UTC)</label>
+        <input type="datetime-local" name="expected_arrival">
+      </div>
+      <div class="form-row">
+        <label>Notes</label>
+        <textarea name="notes" placeholder="Cargo manifest, special instructions…"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('activate-modal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Activate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal: Check-in ───────────────────────────────────────────────── -->
+<div class="modal-overlay" id="checkin-modal">
+  <div class="modal">
+    <h3>📡 Mission Check-In</h3>
+    <form method="POST" id="checkin-form">
+      <div class="form-row">
+        <label>Current Position / Waypoint</label>
+        <input type="text" name="position" placeholder="e.g. Nairobi outskirts checkpoint">
+      </div>
+      <div class="form-row">
+        <label>Status Note</label>
+        <textarea name="note" placeholder="All clear / delay / incident…"></textarea>
+      </div>
+      <div class="form-row">
+        <label>GPS (optional)</label>
+        <div style="display:flex;gap:8px">
+          <input type="number" step="any" name="lat" placeholder="Latitude" style="flex:1">
+          <input type="number" step="any" name="lon" placeholder="Longitude" style="flex:1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('checkin-modal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal: Log disruption ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="disruption-modal">
+  <div class="modal">
+    <h3>⚠ Log Route Disruption</h3>
+    <form method="POST" action="/routing/disruption">
+      <div class="form-row">
+        <label>Segment ID (optional)</label>
+        <input type="text" name="segment_id" placeholder="Leave blank for general area alert">
+      </div>
+      <div class="form-row">
+        <label>Disruption Type</label>
+        <select name="disruption_type">
+          <option value="conflict">Conflict / insecurity</option>
+          <option value="flood">Flood / weather</option>
+          <option value="road_damage">Road damage / impassable</option>
+          <option value="checkpoint">Checkpoint / access delay</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Severity</label>
+        <select name="severity">
+          <option value="critical">Critical — route blocked</option>
+          <option value="high">High — significant delay</option>
+          <option value="medium" selected>Medium — monitor</option>
+          <option value="low">Low — advisory</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Description</label>
+        <textarea name="description" placeholder="Details from field team, media, or Agent 1…" required></textarea>
+      </div>
+      <div class="form-row">
+        <label>Expires (optional)</label>
+        <input type="datetime-local" name="expires_at">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('disruption-modal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Log Disruption</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- ── Leaflet JS ────────────────────────────────────────────────────── -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Map initialisation ───────────────────────────────────────────────
+const map = L.map('route-map').setView([5, 20], 3);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 13,
+}).addTo(map);
+
+// Node type → colour
+const typeColour = {hub:'#1d4ed8', port:'#065f46', forward:'#c2410c', waypoint:'#6b7280'};
+
+// Plot waypoints
+const nodesData = {{ nodes_json | safe }};
+const nodeMarkers = {};
+
+nodesData.forEach(n => {
+  const p = n;
+  const col = typeColour[p.node_type] || '#374151';
+  const marker = L.circleMarker([p.lat, p.lon], {
+    radius: p.node_type === 'hub' ? 8 : p.node_type === 'port' ? 7 : 5,
+    color: col, fillColor: col, fillOpacity: 0.85, weight: 1.5,
+  }).addTo(map);
+  marker.bindPopup(
+    `<b>${p.name}</b><br>${p.country}<br><em>${p.node_type}</em><br>ID: ${p.id}`
+  );
+  nodeMarkers[p.id] = marker;
+});
+
+// ── Plot active route paths ───────────────────────────────────────────
+const nodePos = {};
+nodesData.forEach(n => { nodePos[n.id] = [n.lat, n.lon]; });
+
+{% for plan in plans %}
+{% set route = plan.route_json %}
+{% if route.get('path') and plan.plan_status in ('approved','active','in_transit') %}
+const path_{{ loop.index }} = {{ route.path | tojson }};
+const latlngs_{{ loop.index }} = path_{{ loop.index }}.filter(id => nodePos[id]).map(id => nodePos[id]);
+if (latlngs_{{ loop.index }}.length > 1) {
+  L.polyline(latlngs_{{ loop.index }}, {
+    color: '{% if plan.plan_status == "active" %}#C8102E{% else %}#1d4ed8{% endif %}',
+    weight: {% if plan.plan_status == "active" %}4{% else %}2.5{% endif %},
+    opacity: 0.75, dashArray: {% if plan.plan_status == "approved" %}'8,6'{% else %}null{% endif %},
+  }).addTo(map).bindPopup(
+    `<b>{{ plan.commodity | capitalize }}</b><br>
+     {% for d in plan.dest_node_details %}{{ d.get('name','?') }}{% endfor %}<br>
+     {{ plan.total_km | round(0) | int if plan.total_km else '?' }} km
+     · {{ plan.est_hours | round(1) if plan.est_hours else '?' }}h<br>
+     Score: {{ "%.2f"|format(plan.composite_score) if plan.composite_score is not none else '?' }}`
+  );
+}
+{% endif %}
+{% endfor %}
+
+// ── Tabs ─────────────────────────────────────────────────────────────
+function showTab(name, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'nodes') map.invalidateSize();
+}
+
+// ── Activate mission modal ────────────────────────────────────────────
+function openActivateModal(planId, origin, dest) {
+  const form = document.getElementById('activate-form');
+  form.action = `/routing/plan/${planId}/activate`;
+  document.getElementById('activate-route-label').value = `${origin} → ${dest}`;
+  // Default departure = now (local)
+  const now = new Date();
+  const local = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0,16);
+  form.querySelector('[name=departure_time]').value = local;
+  document.getElementById('activate-modal').classList.add('open');
+}
+
+// ── Check-in modal ────────────────────────────────────────────────────
+function openCheckinModal(missionId) {
+  const form = document.getElementById('checkin-form');
+  form.action = `/routing/mission/${missionId}/checkin`;
+  document.getElementById('checkin-modal').classList.add('open');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ── Plan background polling ───────────────────────────────────────────
+let planPollTimer = null;
+function startPlanPoll() {
+  if (planPollTimer) return;
+  planPollTimer = setInterval(pollPlanStatus, 2500);
+}
+function pollPlanStatus() {
+  fetch('/routing/plan/status').then(r => r.json()).then(data => {
+    const dot  = document.querySelector('.status-dot');
+    const txt  = document.getElementById('plan-status-text');
+    if (dot) { dot.className = 'status-dot ' + data.status; }
+    if (txt) { txt.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1); }
+    if (data.status === 'done' || data.status === 'error') {
+      clearInterval(planPollTimer); planPollTimer = null;
+      if (data.status === 'done') { setTimeout(() => location.reload(), 800); }
+    }
+  }).catch(() => {});
+}
+
+// Auto-start poll if already running
+{% if plan_state.status == 'running' %}startPlanPoll();{% endif %}
+</script>
+
+</body>
+</html>

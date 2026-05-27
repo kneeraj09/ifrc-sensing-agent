@@ -18,7 +18,8 @@ from store.db import (init_db, upsert_signal, upsert_belief_state, get_recent_si
                       mark_demand_source_processed, get_unprocessed_demand_messages,
                       mark_whatsapp_processed, bulk_update_request_status,
                       upsert_gdacs_event, get_gdacs_event_count,
-                      upsert_ifrc_go_event, get_ifrc_go_event_count)
+                      upsert_ifrc_go_event, get_ifrc_go_event_count,
+                      upsert_route_node, get_route_nodes, get_routing_plans, get_active_missions)
 from connectors import bbc_rss, gdelt, reliefweb, acled, gdacs, fewsnet, hdx, telegram_ch, email_imap, whatsapp, ifrc_go
 from connectors.gdacs_historical import fetch_historical
 from extraction.agent import extract_signals
@@ -159,6 +160,33 @@ def cmd_ifrc_go_baseline(years_back: int = 2) -> list:
     return events
 
 
+def cmd_route_seed() -> int:
+    """Seed route nodes from static Africa waypoint list."""
+    from routing.seed_nodes import SEED_NODES
+    for node in SEED_NODES:
+        upsert_route_node(node)
+    total = len(get_route_nodes())
+    print(f"[route-seed] Seeded {len(SEED_NODES)} node(s). Total in DB: {total}")
+    return len(SEED_NODES)
+
+
+def cmd_route_plan(run_id: str = None) -> list:
+    """Build routing plans from the latest (or specified) ratified allocation run."""
+    from routing.planner import plan_from_allocation
+    plans = plan_from_allocation(run_id=run_id)
+    total = len(get_routing_plans())
+    print(f"[route-plan] {len(plans)} new plan(s) created. Total in DB: {total}")
+    return plans
+
+
+def cmd_route_monitor() -> int:
+    """Check active missions for overdue check-ins and new route disruptions."""
+    from routing.monitor import run_monitor
+    signals = get_recent_signals(hours=24)   # last 24h for disruption detection
+    n_alerts = run_monitor(recent_signals=signals)
+    return n_alerts
+
+
 def cmd_gdacs_history(years_back: int = 5, regions: list[str] = None) -> list:
     """Fetch multi-year GDACS events and upsert into the gdacs_events table."""
     if regions is None:
@@ -197,6 +225,11 @@ def main():
     sub.add_parser("demand-cluster", help="Cluster pending requests and generate proposals")
     sub.add_parser("demand-run",     help="Full demand cycle: extract → cluster → propose")
 
+    sub.add_parser("route-seed",    help="Seed humanitarian waypoint nodes into the routing graph")
+    p_rplan = sub.add_parser("route-plan",  help="Plan routes from latest ratified allocation run")
+    p_rplan.add_argument("--run-id", default=None, help="Specific allocation run ID to plan")
+    sub.add_parser("route-monitor", help="Check active missions for overdue check-ins + disruptions")
+
     p_hist = sub.add_parser("gdacs-history", help="Load multi-year GDACS historical events (risk baseline)")
     p_hist.add_argument("--years-back", type=int, default=5,
                         help="Number of past calendar years to fetch (default: 5)")
@@ -228,6 +261,12 @@ def main():
         cmd_demand_cluster()
     elif args.command == "demand-run":
         cmd_demand_run()
+    elif args.command == "route-seed":
+        cmd_route_seed()
+    elif args.command == "route-plan":
+        cmd_route_plan(run_id=getattr(args, "run_id", None) or None)
+    elif args.command == "route-monitor":
+        cmd_route_monitor()
     elif args.command == "gdacs-history":
         cmd_gdacs_history(years_back=args.years_back, regions=args.regions)
     elif args.command == "ifrc-go-baseline":

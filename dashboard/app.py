@@ -18,7 +18,12 @@ from store.db import (store_whatsapp_message, upsert_logistics_request,
                       upsert_stock_position, get_stock_positions, delete_stock_position,
                       upsert_allocation_run, get_allocation_runs, get_latest_allocation_run,
                       get_gdacs_events, get_gdacs_event_count,
-                      get_ifrc_go_event_count, get_glide_links)
+                      get_ifrc_go_event_count, get_glide_links,
+                      get_route_nodes, get_routing_plans, get_active_missions,
+                      get_mission_checkins, get_route_disruptions,
+                      approve_routing_plan, update_routing_plan_status,
+                      upsert_active_mission, update_mission_status,
+                      add_mission_checkin, upsert_route_disruption, resolve_disruption)
 from models import LogisticsRequest, StockPosition, AllocationRun
 from utils.regions import classify
 
@@ -841,6 +846,218 @@ def hazard():
         go_state=go_state,
         gaps=gaps,
     )
+
+
+# ── Routing Agent (Agent 4) ──────────────────────────────────────────────────
+
+_route_plan_state = {"status": "idle", "log": []}
+_route_plan_lock  = threading.Lock()
+
+
+@app.route("/routing")
+def routing():
+    plans       = get_routing_plans()
+    missions    = get_active_missions()
+    disruptions = get_route_disruptions(active_only=False)
+    nodes       = get_route_nodes()
+
+    # Attach node details to plans for display
+    nodes_by_id = {n["id"]: n for n in nodes}
+    for p in plans:
+        p["origin_node_detail"] = nodes_by_id.get(p["origin_node"], {})
+        dest_details = [nodes_by_id.get(d, {}) for d in p["destination_nodes"]]
+        p["dest_node_details"] = dest_details
+
+    # Attach plan detail to missions
+    plans_by_id = {p["id"]: p for p in plans}
+    for m in missions:
+        m["plan"] = plans_by_id.get(m["routing_plan_id"], {})
+
+    # Attach last 3 checkins per mission
+    for m in missions:
+        m["recent_checkins"] = get_mission_checkins(m["id"])[:3]
+
+    stats = {
+        "total_plans":    len(plans),
+        "proposed":       sum(1 for p in plans if p["plan_status"] == "proposed"),
+        "approved":       sum(1 for p in plans if p["plan_status"] == "approved"),
+        "active":         sum(1 for m in missions if m["mission_status"] == "in_transit"),
+        "overdue":        _count_overdue(missions),
+        "disruptions":    sum(1 for d in disruptions if d["active"]),
+    }
+
+    with _route_plan_lock:
+        plan_state = _route_plan_state.copy()
+
+    return render_template(
+        "routing.html",
+        plans=plans, missions=missions, disruptions=disruptions,
+        nodes=nodes, nodes_json=json.dumps(nodes),
+        stats=stats, plan_state=plan_state,
+    )
+
+
+def _count_overdue(missions: list[dict]) -> int:
+    from datetime import datetime as _dt, timezone as _tz
+    count = 0
+    for m in missions:
+        if m["mission_status"] not in ("in_transit", "delayed"):
+            continue
+        last = m.get("last_checkin_at") or m.get("departure_time")
+        if not last:
+            continue
+        try:
+            ts  = _dt.fromisoformat(last.replace("Z", "+00:00"))
+            now = _dt.now(_tz.utc)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=_tz.utc)
+            hrs = (now - ts).total_seconds() / 3600
+            if hrs >= 6:
+                count += 1
+        except Exception:
+            pass
+    return count
+
+
+@app.route("/routing/plan", methods=["POST"])
+def trigger_route_plan():
+    """Trigger background route planning from the latest ratified allocation run."""
+    run_id = request.form.get("run_id") or None
+    args   = ["route-plan"]
+    if run_id:
+        args += ["--run-id", run_id]
+    with _route_plan_lock:
+        if _route_plan_state["status"] == "running":
+            return jsonify({"status": "already_running"}), 409
+    threading.Thread(
+        target=_run_background_cmd,
+        args=(args, 120, _route_plan_state, _route_plan_lock),
+        daemon=True,
+    ).start()
+    return jsonify({"status": "started"}), 202
+
+
+@app.route("/routing/plan/status")
+def route_plan_status():
+    with _route_plan_lock:
+        return jsonify(_route_plan_state.copy())
+
+
+@app.route("/routing/plan/<plan_id>/approve", methods=["POST"])
+def approve_plan(plan_id):
+    approved_by = request.form.get("approved_by", "coordinator")
+    approve_routing_plan(plan_id, approved_by=approved_by)
+    return redirect("/routing")
+
+
+@app.route("/routing/plan/<plan_id>/cancel", methods=["POST"])
+def cancel_plan(plan_id):
+    update_routing_plan_status(plan_id, "cancelled")
+    return redirect("/routing")
+
+
+@app.route("/routing/plan/<plan_id>/activate", methods=["POST"])
+def activate_mission(plan_id):
+    """Create an active mission from an approved routing plan."""
+    import uuid as _uuid
+    plans   = get_routing_plans()
+    plan    = next((p for p in plans if p["id"] == plan_id), None)
+    if not plan or plan["plan_status"] != "approved":
+        return redirect("/routing")
+
+    mission = {
+        "id":                str(_uuid.uuid4()),
+        "routing_plan_id":   plan_id,
+        "allocation_run_id": plan["allocation_run_id"],
+        "mission_status":    "in_transit",
+        "driver_contact":    request.form.get("driver_contact", ""),
+        "convoy_size":       int(request.form.get("convoy_size", 1) or 1),
+        "departure_time":    request.form.get("departure_time") or datetime.utcnow().isoformat(),
+        "expected_arrival":  request.form.get("expected_arrival") or None,
+        "last_checkin_at":   datetime.utcnow().isoformat(),
+        "last_position":     plan.get("origin_node", ""),
+        "notes":             request.form.get("notes", ""),
+    }
+    upsert_active_mission(mission)
+    update_routing_plan_status(plan_id, "active")
+    return redirect("/routing")
+
+
+@app.route("/routing/mission/<mission_id>/checkin", methods=["POST"])
+def mission_checkin(mission_id):
+    checkin = {
+        "mission_id":    mission_id,
+        "position_name": request.form.get("position", ""),
+        "status_note":   request.form.get("note", ""),
+        "source":        "manual",
+    }
+    lat_s = request.form.get("lat")
+    lon_s = request.form.get("lon")
+    if lat_s and lon_s:
+        try:
+            checkin["lat"] = float(lat_s)
+            checkin["lon"] = float(lon_s)
+        except ValueError:
+            pass
+    add_mission_checkin(checkin)
+    return redirect("/routing")
+
+
+@app.route("/routing/mission/<mission_id>/complete", methods=["POST"])
+def complete_mission(mission_id):
+    update_mission_status(mission_id, "completed",
+                          notes=request.form.get("notes", "Marked complete by coordinator."))
+    missions = get_active_missions()
+    m = next((x for x in missions if x["id"] == mission_id), None)
+    if m and m.get("routing_plan_id"):
+        update_routing_plan_status(m["routing_plan_id"], "completed")
+    return redirect("/routing")
+
+
+@app.route("/routing/mission/<mission_id>/abort", methods=["POST"])
+def abort_mission(mission_id):
+    update_mission_status(mission_id, "aborted",
+                          notes=request.form.get("notes", "Aborted by coordinator."))
+    return redirect("/routing")
+
+
+@app.route("/routing/disruption", methods=["POST"])
+def add_disruption():
+    import uuid as _uuid
+    disruption = {
+        "id":              str(_uuid.uuid4()),
+        "segment_id":      request.form.get("segment_id", ""),
+        "disruption_type": request.form.get("disruption_type", "other"),
+        "severity":        request.form.get("severity", "medium"),
+        "description":     request.form.get("description", ""),
+        "expires_at":      request.form.get("expires_at") or None,
+        "source":          "manual",
+        "active":          1,
+    }
+    upsert_route_disruption(disruption)
+    return redirect("/routing")
+
+
+@app.route("/routing/disruption/<disruption_id>/resolve", methods=["POST"])
+def resolve_route_disruption(disruption_id):
+    resolve_disruption(disruption_id)
+    return redirect("/routing")
+
+
+@app.route("/routing/nodes")
+def routing_nodes_json():
+    """GeoJSON endpoint for Leaflet map."""
+    nodes = get_route_nodes()
+    features = []
+    for n in nodes:
+        if n.get("lat") is None:
+            continue
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [n["lon"], n["lat"]]},
+            "properties": {k: v for k, v in n.items() if k not in ("lat", "lon")},
+        })
+    return jsonify({"type": "FeatureCollection", "features": features})
 
 
 if __name__ == "__main__":
