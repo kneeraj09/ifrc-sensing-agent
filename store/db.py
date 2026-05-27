@@ -391,8 +391,12 @@ def mark_whatsapp_processed(ids: list[int]):
 
 def upsert_stock_position(pos: StockPosition):
     with _conn() as conn:
+        # Explicit column list so INSERT is correct regardless of physical column
+        # order (region was added via ALTER TABLE and sits at the end of the table).
         conn.execute(
-            "INSERT OR REPLACE INTO stock_positions VALUES (:id,:commodity,:depot_location,:region,:quantity,:unit,:as_of,:created_at)",
+            "INSERT OR REPLACE INTO stock_positions "
+            "(id, commodity, depot_location, region, quantity, unit, as_of, created_at) "
+            "VALUES (:id, :commodity, :depot_location, :region, :quantity, :unit, :as_of, :created_at)",
             {"id": pos.id, "commodity": pos.commodity, "depot_location": pos.depot_location,
              "region": pos.region, "quantity": pos.quantity, "unit": pos.unit,
              "as_of": pos.as_of, "created_at": pos.created_at},
@@ -401,7 +405,12 @@ def upsert_stock_position(pos: StockPosition):
 
 def get_stock_positions() -> list[dict]:
     with _conn() as conn:
-        rows = conn.execute("SELECT * FROM stock_positions ORDER BY created_at DESC").fetchall()
+        # Explicit column list so the returned dict keys are stable regardless
+        # of physical column order in the DB.
+        rows = conn.execute(
+            "SELECT id, commodity, depot_location, region, quantity, unit, as_of, created_at "
+            "FROM stock_positions ORDER BY created_at DESC"
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
