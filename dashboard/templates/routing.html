@@ -202,12 +202,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#222;font-
     <div style="font-weight:700;color:#92400e;font-size:.88rem">Waypoint network not yet seeded</div>
     <div style="font-size:.78rem;color:#78350f;margin-top:2px">Click the button to load 46 humanitarian waypoints across Africa into the routing graph. This only needs to be done once.</div>
   </div>
-  <form method="POST" action="/routing/seed" id="seed-form" style="display:inline">
-    <button type="submit" class="btn" style="background:#d97706;color:#fff;font-size:.85rem;padding:9px 20px"
-      onclick="startSeedPoll()">
-      🌍 Seed Africa Waypoints
-    </button>
-  </form>
+  <button type="button" class="btn" style="background:#d97706;color:#fff;font-size:.85rem;padding:9px 20px"
+    onclick="triggerSeed()">
+    🌍 Seed Africa Waypoints
+  </button>
   <div style="display:flex;align-items:center;gap:6px;font-size:.78rem">
     <span class="status-dot idle" id="seed-dot"></span>
     <span id="seed-status-text" style="color:#92400e">Ready</span>
@@ -220,34 +218,40 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f8;color:#222;font-
 
 <!-- ── Action bar ────────────────────────────────────────────────────── -->
 <div class="action-bar">
-  <form method="POST" action="/routing/plan" id="plan-form" style="display:inline">
-    <button type="submit" class="btn btn-primary" onclick="startPlanPoll()">
-      ▶ Plan Routes from Latest Ratified Run
-    </button>
-  </form>
+  <button type="button" class="btn btn-primary" onclick="triggerPlan()">
+    ▶ Plan Routes from Latest Ratified Run
+  </button>
   {% if nodes %}
-  <form method="POST" action="/routing/seed" id="seed-form-bar" style="display:inline">
-    <button type="submit" class="btn btn-outline btn-sm" onclick="startSeedPoll(true)"
-      title="Re-seed waypoints (adds any new nodes, safe to run again)">
-      🌍 Re-seed Waypoints
-    </button>
-  </form>
+  <button type="button" class="btn btn-outline btn-sm" onclick="triggerSeed()"
+    title="Re-seed waypoints (adds any new nodes, safe to run again)">
+    🌍 Re-seed Waypoints
+  </button>
   {% endif %}
   <button class="btn btn-outline btn-sm" onclick="document.getElementById('disruption-modal').classList.add('open')">
     + Log Disruption
   </button>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.78rem">
-    <span class="status-dot {{ plan_state.status }}"></span>
+    <span class="status-dot {{ plan_state.status }}" id="plan-dot"></span>
     <span id="plan-status-text" style="color:#666">
       {{ plan_state.status | capitalize }}
     </span>
   </div>
 </div>
 
-{% if plan_state.log %}
-<div style="padding:0 24px 8px">
-  <div class="status-log" id="plan-log">{{ plan_state.log | join('\n') }}</div>
+<div id="plan-log-wrap" style="display:none;padding:0 24px 8px">
+  <div class="status-log" id="plan-log"></div>
 </div>
+{% if plan_state.log %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var wrap = document.getElementById('plan-log-wrap');
+    var log  = document.getElementById('plan-log');
+    if (wrap && log) {
+      log.textContent = {{ plan_state.log | join('\n') | tojson }};
+      wrap.style.display = 'block';
+    }
+  });
+</script>
 {% endif %}
 
 <!-- ── Main layout: left tabs + right map ─────────────────────────────── -->
@@ -724,58 +728,66 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   });
 });
 
-// ── Plan background polling ───────────────────────────────────────────
-let planPollTimer = null;
-function startPlanPoll() {
-  if (planPollTimer) return;
-  planPollTimer = setInterval(pollPlanStatus, 2500);
-}
-function pollPlanStatus() {
-  fetch('/routing/plan/status').then(r => r.json()).then(data => {
-    const dot  = document.querySelector('.status-dot');
-    const txt  = document.getElementById('plan-status-text');
-    if (dot) { dot.className = 'status-dot ' + data.status; }
-    if (txt) { txt.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1); }
-    if (data.status === 'done' || data.status === 'error') {
-      clearInterval(planPollTimer); planPollTimer = null;
-      if (data.status === 'done') { setTimeout(() => location.reload(), 800); }
-    }
-  }).catch(() => {});
+// ── Generic AJAX trigger + poll ──────────────────────────────────────
+function ajaxTrigger(postUrl, statusUrl, dotId, txtId, logWrapId, logId, onDone) {
+  fetch(postUrl, { method: 'POST' })
+    .then(r => {
+      if (r.status === 409) { alert('Already running — please wait.'); return; }
+      if (!r.ok) { alert('Failed to start (' + r.status + ')'); return; }
+      startPoll(statusUrl, dotId, txtId, logWrapId, logId, onDone);
+    })
+    .catch(err => alert('Network error: ' + err));
 }
 
-// Auto-start poll if already running
-{% if plan_state.status == 'running' %}startPlanPoll();{% endif %}
+function startPoll(statusUrl, dotId, txtId, logWrapId, logId, onDone) {
+  const dot  = document.getElementById(dotId);
+  const txt  = document.getElementById(txtId);
+  if (dot) dot.className = 'status-dot running';
+  if (txt) txt.textContent = 'Running…';
 
-// ── Seed background polling ───────────────────────────────────────────
-let seedPollTimer = null;
-function startSeedPoll(fromBar) {
-  if (seedPollTimer) return;
-  const dot  = document.getElementById('seed-dot');
-  const txt  = document.getElementById('seed-status-text');
-  const wrap = document.getElementById('seed-log-wrap');
-  if (dot) { dot.className = 'status-dot running'; }
-  if (txt) { txt.textContent = 'Seeding…'; }
-  seedPollTimer = setInterval(() => {
-    fetch('/routing/seed/status').then(r => r.json()).then(data => {
-      if (dot) { dot.className = 'status-dot ' + data.status; }
-      if (txt) { txt.textContent = data.status === 'running' ? 'Seeding…'
-                                  : data.status === 'done'    ? 'Done!'
-                                  : data.status === 'error'   ? 'Error'
-                                  : data.status; }
-      if (data.log && data.log.length && wrap) {
-        wrap.style.display = 'block';
-        const logEl = document.getElementById('seed-log');
-        if (logEl) logEl.textContent = data.log.join('\n');
+  const timer = setInterval(() => {
+    fetch(statusUrl).then(r => r.json()).then(data => {
+      if (dot) dot.className = 'status-dot ' + data.status;
+      if (txt) txt.textContent = data.status === 'running' ? 'Running…'
+                               : data.status === 'done'    ? 'Done!'
+                               : data.status === 'error'   ? 'Error — see log'
+                               : data.status;
+      if (data.log && data.log.length) {
+        const wrap = document.getElementById(logWrapId);
+        const log  = document.getElementById(logId);
+        if (wrap) wrap.style.display = 'block';
+        if (log)  log.textContent = data.log.join('\n');
       }
-      if (data.status === 'done') {
-        clearInterval(seedPollTimer); seedPollTimer = null;
-        setTimeout(() => location.reload(), 1000);
-      } else if (data.status === 'error') {
-        clearInterval(seedPollTimer); seedPollTimer = null;
+      if (data.status === 'done' || data.status === 'error') {
+        clearInterval(timer);
+        if (data.status === 'done') { setTimeout(onDone, 800); }
       }
     }).catch(() => {});
   }, 1500);
 }
+
+// ── Seed button ───────────────────────────────────────────────────────
+function triggerSeed() {
+  ajaxTrigger(
+    '/routing/seed', '/routing/seed/status',
+    'seed-dot', 'seed-status-text', 'seed-log-wrap', 'seed-log',
+    () => location.reload()
+  );
+}
+
+// ── Plan button ───────────────────────────────────────────────────────
+function triggerPlan() {
+  ajaxTrigger(
+    '/routing/plan', '/routing/plan/status',
+    'plan-dot', 'plan-status-text', 'plan-log-wrap', 'plan-log',
+    () => location.reload()
+  );
+}
+
+// Auto-resume poll if page loaded mid-run
+{% if plan_state.status == 'running' %}
+startPoll('/routing/plan/status','plan-dot','plan-status-text','plan-log-wrap','plan-log',()=>location.reload());
+{% endif %}
 </script>
 
 </body>
