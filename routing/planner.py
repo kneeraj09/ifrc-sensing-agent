@@ -119,28 +119,53 @@ def plan_from_allocation(run_id: str | None = None) -> list[dict]:
               f"({run['commodity']} {run['available_stock']} {run['unit']})")
 
         # ── Identify origin node ─────────────────────────────────────────────
-        # Stock positions carry depot_location; use coordinator_overrides or
-        # scenario_results to discover the depot.
+        # Priority order:
+        #   1. Stock position whose commodity matches (exact)
+        #   2. Any stock position when commodity is "all" or no exact match
+        #   3. First valid (non-blank, non-<UNKNOWN>) location in scenario_results
         from store.db import get_stock_positions
         stock = get_stock_positions()
         commodity = run["commodity"]
+
+        _BAD_LOCS = {"", "<unknown>", "unknown", "none", "n/a"}
+
         depot_str = ""
+        # Pass 1: exact commodity match
         for sp in stock:
             if sp["commodity"].lower() == commodity.lower():
-                depot_str = sp["depot_location"]
+                depot_str = sp.get("depot_location", "").strip()
                 break
-        if not depot_str:
-            # Fall back to first location in scenario_results as origin
-            first_loc = None
-            for sc, results in run["scenario_results"].items():
-                if results:
-                    first_loc = results[0].get("location", "")
+        # Pass 2: any stock position (catches commodity="all" or mismatched labels)
+        if not depot_str or depot_str.lower() in _BAD_LOCS:
+            for sp in stock:
+                candidate = sp.get("depot_location", "").strip()
+                if candidate and candidate.lower() not in _BAD_LOCS:
+                    depot_str = candidate
+                    print(f"  [planner] No exact commodity match — using depot '{depot_str}' from stock position")
                     break
-            depot_str = first_loc or "Unknown depot"
+        # Pass 3: first valid location from scenario results
+        if not depot_str or depot_str.lower() in _BAD_LOCS:
+            for sc, results in run["scenario_results"].items():
+                for r in results:
+                    loc = (r.get("location") or "").strip()
+                    if loc and loc.lower() not in _BAD_LOCS:
+                        depot_str = loc
+                        print(f"  [planner] No stock positions found — using first result location '{depot_str}' as origin")
+                        break
+                if depot_str:
+                    break
+
+        if not depot_str or depot_str.lower() in _BAD_LOCS:
+            print(f"  [planner] Could not determine origin depot for run {run['id'][:8]}.")
+            print(f"  [planner] Tip: add a stock position with a depot_location that matches a route node name.")
+            continue
 
         origin_node = _resolve_origin(depot_str, nodes)
         if not origin_node:
-            print(f"  [planner] Could not resolve origin '{depot_str}' — skipping run.")
+            print(f"  [planner] Could not match '{depot_str}' to any route node — skipping run.")
+            print(f"  [planner] Available nodes: {', '.join(n['name'] for n in nodes[:10])}…")
+            print(f"  [planner] Tip: the depot_location in your stock position should contain a city name")
+            print(f"             that matches one of the 46 seeded waypoints (e.g. 'Nairobi', 'Kampala').")
             continue
         print(f"  [planner] Origin: {origin_node['name']} ({origin_node['id']})")
 
@@ -161,8 +186,13 @@ def plan_from_allocation(run_id: str | None = None) -> list[dict]:
 
         # ── One plan per destination ─────────────────────────────────────────
         for alloc in allocations:
-            dest_str = alloc.get("location", "")
+            dest_str = (alloc.get("location") or "").strip()
             qty      = alloc.get("allocated_qty", alloc.get("quantity"))
+
+            # Skip blank / unknown destinations
+            if not dest_str or dest_str.lower() in _BAD_LOCS:
+                continue
+
             dest_node = _resolve_origin(dest_str, nodes)
             if not dest_node:
                 print(f"    [planner] No node match for destination '{dest_str}' — skipping.")
