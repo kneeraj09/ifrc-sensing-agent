@@ -97,12 +97,18 @@ def plan_from_allocation(run_id: str | None = None) -> list[dict]:
         print("[planner] No ratified allocation runs found.")
         return []
 
-    # Filter to a specific run or find the first unplanned one
+    # Filter to a specific run or find the first unplanned one.
+    # A run is considered "planned" only if it has at least one non-cancelled plan
+    # so that cancelling all plans for a run allows it to be re-planned (e.g. to
+    # pick up a newly configured ORS API key).
     if run_id:
         runs = [r for r in runs if r["id"] == run_id]
     else:
-        existing_ids = {p["allocation_run_id"] for p in get_routing_plans()}
-        runs = [r for r in runs if r["id"] not in existing_ids][:1]
+        active_plan_run_ids = {
+            p["allocation_run_id"] for p in get_routing_plans()
+            if p.get("plan_status") != "cancelled"
+        }
+        runs = [r for r in runs if r["id"] not in active_plan_run_ids][:1]
 
     if not runs:
         print("[planner] No unplanned ratified runs to process.")
