@@ -853,6 +853,29 @@ def hazard():
 _route_plan_state = {"status": "idle", "log": []}
 _route_plan_lock  = threading.Lock()
 
+_route_seed_state = {"status": "idle", "log": []}
+_route_seed_lock  = threading.Lock()
+
+
+@app.route("/routing/seed", methods=["POST"])
+def trigger_route_seed():
+    """Seed the 46 Africa waypoints into route_nodes (one-time setup)."""
+    with _route_seed_lock:
+        if _route_seed_state["status"] == "running":
+            return jsonify({"status": "already_running"}), 409
+    threading.Thread(
+        target=_run_background_cmd,
+        args=(["route-seed"], 60, _route_seed_state, _route_seed_lock),
+        daemon=True,
+    ).start()
+    return jsonify({"status": "started"}), 202
+
+
+@app.route("/routing/seed/status")
+def route_seed_status():
+    with _route_seed_lock:
+        return jsonify(_route_seed_state.copy())
+
 
 @app.route("/routing")
 def routing():
