@@ -184,9 +184,21 @@
     </div>
     <div class="pipe-arrow">›</div>
     <div class="pipe-step accent">
-      <div class="ps-num">Output</div>
+      <div class="ps-num">Agent 3 Output</div>
       <div class="ps-name">Ratified Decision</div>
       <div class="ps-sub">Coordinator selects scenario, reviews SCQA brief, enters rationale — creates audit record</div>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step" style="background:#f0faf4">
+      <div class="ps-num">Agent 4</div>
+      <div class="ps-name">Route Planning</div>
+      <div class="ps-sub">Ratified run triggers the planner — best paths scored, route plans proposed for approval</div>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step" style="background:#f0faf4">
+      <div class="ps-num">Agent 4</div>
+      <div class="ps-name">Mission Monitor</div>
+      <div class="ps-sub">Active convoys tracked — overdue check-ins and route disruptions flagged in real time</div>
     </div>
   </div>
 
@@ -789,11 +801,141 @@
   </div>
 </div>
 
+<!-- ════════════════ AGENT 4 ════════════════ -->
+<div class="agent-divider">
+  <div class="agent-divider-bar">
+    <span class="agent-num">Agent 4</span>
+    <span class="agent-name">Routing &amp; Execution Orchestration</span>
+    <span class="agent-desc">Route graph · Composite scoring · Mission tracking · Disruption alerts</span>
+  </div>
+</div>
+
+<div class="page" style="padding-top:20px">
+  <div class="columns">
+
+    <!-- LEFT: route planning, scoring, graph -->
+    <div class="col">
+
+      <div class="sec-header">How Route Plans Are Built</div>
+      <ol class="steps">
+        <li data-n="1">A coordinator <strong>ratifies</strong> an allocation run (Agent 3) — this triggers the route planner automatically</li>
+        <li data-n="2">The planner resolves the <strong>origin node</strong> from the stock position's depot location (matched against named waypoints)</li>
+        <li data-n="3">Each allocation destination becomes a separate candidate route plan</li>
+        <li data-n="4">The route graph runs a <strong>modified Dijkstra</strong> to find the highest-scoring path between origin and destination</li>
+        <li data-n="5"><strong>OpenRouteService</strong> (real road network via OSM) provides actual distance and drive time; haversine × 1.4 is used as fallback if no API key is set</li>
+        <li data-n="6">Plans are stored with status <em>proposed</em> — a coordinator must approve before a mission is activated</li>
+      </ol>
+
+      <div class="sec-header">Route Composite Score</div>
+      <p class="body-text bold">The planner maximises a composite score — it does not simply minimise distance.</p>
+      <div class="formula-box">
+        <div class="formula">Score = 0.50 × min_safety + 0.30 × prod_reliability − 0.20 × norm_time</div>
+        <div class="formula-desc">
+          <strong>min_safety</strong> — the lowest safety score of any segment on the path (weakest-link principle; one dangerous segment poisons the whole route)<br>
+          <strong>prod_reliability</strong> — product of all segment reliability scores (reflects the compounding probability that every leg completes without disruption)<br>
+          <strong>norm_time</strong> — estimated travel time normalised 0–1 across candidate paths; longer routes penalised but with lower weight than safety
+        </div>
+      </div>
+      <table class="cs-table">
+        <thead><tr><th>Component</th><th>Weight</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Safety</strong></td><td class="wt">0.50</td><td>ACLED conflict density + GDACS hazards + manual input</td></tr>
+          <tr><td><strong>Reliability</strong></td><td class="wt">0.30</td><td>Same three-layer prior (see below)</td></tr>
+          <tr><td><strong>Time</strong></td><td class="wt">0.20</td><td>ORS road distance ÷ 50 km/h convoy speed</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec-header">Segment Safety &amp; Reliability Scoring</div>
+      <p class="body-text">Each route segment score is derived from a three-layer prior:</p>
+      <table class="cs-table">
+        <thead><tr><th>Layer</th><th>Weight</th><th>How it is computed</th></tr></thead>
+        <tbody>
+          <tr><td><strong>ACLED conflict</strong></td><td class="wt">40%</td><td>Events within 150 km of the segment midpoint, decayed with a 30-day half-life; urgency-weighted (immediate=1.0 → low=0.2)</td></tr>
+          <tr><td><strong>GDACS hazard</strong></td><td class="wt">30%</td><td>Active disaster alerts near the route from the hazard baseline; tier penalties: critical −0.45, high −0.30, medium −0.15, low −0.05</td></tr>
+          <tr><td><strong>Coordinator input</strong></td><td class="wt">30%</td><td>Manual reliability / safety override entered on the Routing dashboard; defaults to 0.75 if no data</td></tr>
+        </tbody>
+      </table>
+      <p class="body-text" style="margin-top:6px">All scores are clamped to [0.05, 0.99]. A segment is never rated zero or perfect — uncertainty is always present. Auto-generated edges (no manual data, no recent signals) default to 0.75.</p>
+
+      <div class="sec-header">Route Plan Statuses</div>
+      <table class="cs-table">
+        <thead><tr><th>Status</th><th>Meaning</th><th>Who sets it</th></tr></thead>
+        <tbody>
+          <tr><td><strong>proposed</strong></td><td>Auto-generated by the planner — awaiting coordinator review</td><td>System</td></tr>
+          <tr><td><strong>approved</strong></td><td>Coordinator has reviewed and approved — ready to activate</td><td>Coordinator</td></tr>
+          <tr><td><strong>active</strong></td><td>Convoy is en route — mission created and being monitored</td><td>Coordinator</td></tr>
+          <tr><td><strong>completed</strong></td><td>Convoy arrived and confirmed at destination</td><td>Coordinator</td></tr>
+          <tr><td><strong>cancelled</strong></td><td>Plan withdrawn before activation</td><td>Coordinator</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+
+    <!-- RIGHT: waypoint network, missions, monitoring -->
+    <div class="col">
+
+      <div class="sec-header">The Route Waypoint Network</div>
+      <p class="body-text">The routing agent uses a graph of <strong>46 humanitarian waypoints</strong> across Africa as the backbone for all route planning. These represent major hubs, ports, forward bases, and key transit points used in IFRC operations.</p>
+      <table class="cs-table">
+        <thead><tr><th>Node type</th><th>What it represents</th><th>Examples</th></tr></thead>
+        <tbody>
+          <tr><td><strong>hub</strong></td><td>Major IFRC/ICRC regional hub with warehouse and staff</td><td>Nairobi, Kampala, Addis Ababa, Dakar</td></tr>
+          <tr><td><strong>port</strong></td><td>Seaport with import/export capacity</td><td>Mombasa, Dar es Salaam, Djibouti</td></tr>
+          <tr><td><strong>forward_base</strong></td><td>Sub-regional staging point for last-mile delivery</td><td>Juba, Mogadishu, Goma, Bamako</td></tr>
+          <tr><td><strong>waypoint</strong></td><td>Transit node or intermediate staging location</td><td>Kolwezi, Ndola, Zinder, Diffa</td></tr>
+        </tbody>
+      </table>
+      <p class="body-text" style="margin-top:6px"><strong>Auto-edges:</strong> any two nodes within 1,200 km are automatically connected with a default score of 0.75. This ensures the network is fully connected even before manual segment data is entered. Edges are re-scored when new ACLED or GDACS data arrives.</p>
+      <p class="body-text">To seed the waypoints on a fresh deployment, go to the <a href="/routing">Routing dashboard</a> and click <strong>Seed Waypoints</strong>, or run <code>python main.py route-seed</code>.</p>
+
+      <div class="sec-header">Mission Monitoring</div>
+      <p class="body-text">Once a route plan is activated, a mission record is created and the monitor runs after each sensing cycle to check for problems.</p>
+      <table class="cs-table">
+        <thead><tr><th>Check</th><th>Threshold</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Overdue check-in</strong></td><td>&gt; 6 hours since last update</td><td>Alert created; coordinator notified on Routing dashboard</td></tr>
+          <tr><td><strong>Route disruption</strong></td><td>Agent 1 conflict / access / risk / infrastructure signal within 200 km of any active segment midpoint</td><td>Disruption record logged; mission flagged for review</td></tr>
+        </tbody>
+      </table>
+      <ul class="bullets">
+        <li>Field teams log check-ins via the <strong>Check-in</strong> button on the active mission card — records location, status, and notes</li>
+        <li>Disruptions can be manually logged by coordinators and resolved once cleared</li>
+        <li>A mission can be <strong>aborted</strong> at any time; the reason is stored in the audit trail</li>
+        <li>The live Leaflet.js map on the Routing dashboard draws polylines for all approved/active route plans colour-coded by plan status</li>
+      </ul>
+
+      <div class="sec-header">Coordinator Workflow — Routing</div>
+      <ol class="steps">
+        <li data-n="1"><strong>Ratify</strong> an allocation run (Agent 3) — the planner runs automatically in the background</li>
+        <li data-n="2">Go to the <a href="/routing">Routing dashboard</a> → <strong>Route Plans</strong> tab — proposed plans appear with path, distance, travel time, and composite score</li>
+        <li data-n="3">Review the score bar and path labels; check the map polyline for geographic sense</li>
+        <li data-n="4">Click <strong>Approve</strong> on plans that look operationally sound</li>
+        <li data-n="5">When a convoy is ready to depart, click <strong>Activate Mission</strong> — enter vehicle info, driver, estimated departure</li>
+        <li data-n="6">Field team logs <strong>Check-ins</strong> during transit; the monitor flags any silence &gt; 6 h</li>
+        <li data-n="7">On arrival, click <strong>Complete Mission</strong> — the record is closed and archived</li>
+        <li data-n="8">If a disruption is detected, log it on the <strong>Disruptions</strong> tab and resolve it once cleared</li>
+      </ol>
+
+      <div class="sec-header">Key Principles</div>
+      <ul class="bullets">
+        <li>The planner proposes — no convoy moves without a coordinator <strong>approving</strong> the plan and <strong>activating</strong> the mission</li>
+        <li>Safety is the primary routing criterion (weight 0.50) — a shorter but riskier route will lose to a longer safe one</li>
+        <li>Scores update automatically when Agent 1 ingests new conflict or hazard data — re-run the planner to reflect current conditions</li>
+        <li>Depot location in the stock position must match a waypoint name (e.g. "Nairobi", "Kampala") for the planner to resolve the origin</li>
+        <li>All routing decisions, approvals, check-ins, and disruptions are stored permanently in the database</li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
 <div class="doc-footer">
-  <strong style="color:rgba(255,255,255,.7)">Sensing Agent CLI</strong><br>
+  <strong style="color:rgba(255,255,255,.7)">Sensing Agent CLI — Quick Reference</strong><br>
   Agent 1 (sensing): <code>python main.py run</code> &nbsp;|&nbsp;
   Agent 2 (demand): <code>python main.py demand-run</code> &nbsp;|&nbsp;
   Agent 3 (allocation): <a href="/allocation" style="color:rgba(255,255,255,.5)">Allocation dashboard</a><br>
+  Agent 4 (routing): <code>python main.py route-seed</code> &nbsp;·&nbsp; <code>python main.py route-plan</code> &nbsp;·&nbsp; <code>python main.py route-monitor</code> &nbsp;|&nbsp;
+  <a href="/routing" style="color:rgba(255,255,255,.5)">Routing dashboard</a><br>
   Hazard baseline: <code>python main.py gdacs-history</code> then <code>python main.py ifrc-go-baseline</code> &nbsp;|&nbsp;
   Signals window: 72h &nbsp;|&nbsp; Briefing refresh: 30 min
 </div>
